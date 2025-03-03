@@ -23,8 +23,10 @@ const io = new SocketIOServer(server, {
 });
 // 📌 Middleware global
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
+  origin: [process.env.FRONTEND_URL || 'http://localhost:3000', 'https://v0-poliorganiza-t2.vercel.app'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 
