@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "target": "ES2019",           /* Versión de JS a la que se compilará */
+    "module": "commonjs",         /* Módulo usado: commonjs (Node) */
+    "outDir": "./dist",           /* Carpeta de salida para archivos compilados */
+    "rootDir": "./src",           /* Carpeta raíz de nuestro código TS */
+    "esModuleInterop": true,      /* Permite imports compatibles con ES Modules */
+    "strict": true,               /* Habilita todas las comprobaciones estrictas */
+    "skipLibCheck": true          /* Opcional: omitir verificación de archivos .d.ts */
+  }
+}
