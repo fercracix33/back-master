@@ -15,19 +15,17 @@ const createChat: RequestHandler = async (req, res): Promise<void> => {
   }
 
   try {
-    // Convertir los IDs a números y asegurar que el usuario actual esté incluido
     const participants = participantIds.map(Number);
     if (!participants.includes(userId)) {
       participants.push(userId);
     }
 
-    // Crear chat en la base de datos
     const newChat = await prisma.chat.create({
       data: {
         name: isGroup ? name : null,
         isGroup: Boolean(isGroup),
         users: {
-          connect: participants.map(id => ({ id })) // Conecta los usuarios en la tabla intermedia
+          connect: participants.map((id: number) => ({ id }))
         }
       },
       include: {
@@ -50,7 +48,7 @@ const getChats: RequestHandler = async (req, res): Promise<void> => {
     const chats = await prisma.chat.findMany({
       where: {
         users: {
-          some: { id: userId } // Filtra chats donde el usuario está presente
+          some: { id: userId }
         }
       },
       include: {
@@ -81,7 +79,6 @@ const getChatMessages: RequestHandler = async (req, res): Promise<void> => {
   }
 
   try {
-    // Verificar que el usuario es miembro del chat
     const chat = await prisma.chat.findUnique({
       where: { id: chatId },
       include: { users: { select: { id: true } } }
@@ -92,13 +89,12 @@ const getChatMessages: RequestHandler = async (req, res): Promise<void> => {
       return;
     }
 
-    const isMember = chat.users.some(u => u.id === userId);
+    const isMember = chat.users.some((u: { id: number }) => u.id === userId);
     if (!isMember) {
       res.status(403).json({ error: 'No tienes permiso para acceder a este chat.' });
       return;
     }
 
-    // Obtener mensajes (podríamos agregar paginación con `skip`, `take`)
     const messages = await prisma.message.findMany({
       where: { chatId },
       orderBy: { createdAt: 'asc' },
@@ -112,7 +108,6 @@ const getChatMessages: RequestHandler = async (req, res): Promise<void> => {
   }
 };
 
-// Asignar las funciones a las rutas
 chatRouter.post('/', createChat);
 chatRouter.get('/', getChats);
 chatRouter.get('/:chatId/messages', getChatMessages);
