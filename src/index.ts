@@ -19,11 +19,11 @@ dotenv.config();
 const app: Application = express();
 const server = http.createServer(app);
 const io = new SocketIOServer(server, {
-  cors: { origin: process.env.FRONTEND_URL || 'http://localhost:3000' }
+  cors: { origin: '*' } // Permite cualquier origen para WebSockets
 });
 // 📌 Middleware global
 app.use(cors({
-  origin: [process.env.FRONTEND_URL || 'http://localhost:3000', 'https://v0-poliorganiza-t2.vercel.app'],
+  origin: '*', // Permite cualquier origen temporalmente
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
