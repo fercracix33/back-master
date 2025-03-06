@@ -1,5 +1,3 @@
-// prisma/schema.prisma
-
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
@@ -7,6 +5,13 @@ datasource db {
 
 generator client {
   provider = "prisma-client-js"
+}
+
+// Definición del estado de amistad
+enum FriendStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
 }
 
 // Modelo de Usuario
@@ -19,40 +24,46 @@ model User {
   notes         Note[]            // Notas propias del usuario
   folders       Folder[]          // Carpetas del usuario
   boards        Board[]           // Tableros (para tareas) del usuario
-  chats         Chat[]            @relation("UserChats") // Conversaciones (chat) en las que participa
-  messages      Message[]         @relation("UserMessages") // Mensajes enviados por el usuario
+  chats         Chat[]            @relation("UserChats")
+  messages      Message[]         @relation("UserMessages")
   notifications Notification[]    // Notificaciones del usuario
+  friendRequestsSent   FriendRequest[] @relation("RequestsSent")
+  friendRequestsReceived FriendRequest[] @relation("RequestsReceived")
+  ownedEvents   Event[]          @relation("EventOwner")
+  events        Event[]          @relation("EventParticipants")
 }
 
 // Modelo de Nota
 model Note {
-  id          Int      @id @default(autoincrement())
-  title       String
-  content     String
-  isPublic    Boolean  @default(false)  // true si la nota es pública (visible en la zona social)
-  likes       Int      @default(0)      // contador de "me gustas" o valoraciones
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  title     String
+  content   String   @db.MediumText
+  isPublic  Boolean  @default(false)
+  likes     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   // Relaciones
-  author      User     @relation(fields: [authorId], references: [id])
-  authorId    Int
-  folder      Folder?  @relation(fields: [folderId], references: [id])
-  folderId    Int?
-  // Para copiar notas: si un usuario copia una nota pública, se crea una nueva Note con su autorId
-  messages    Message[]  // Mensajes que hacen referencia a esta nota
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  Int
+  folder    Folder?  @relation(fields: [folderId], references: [id])
+  folderId  Int?
+  messages  Message[]  // Mensajes que hacen referencia a esta nota
 }
 
 // Modelo de Carpeta (para organizar notas del usuario)
 model Folder {
-  id       Int    @id @default(autoincrement())
+  id       Int     @id @default(autoincrement())
   name     String
+  parent   Folder? @relation("FolderHierarchy", fields: [parentId], references: [id])
+  parentId Int?
+  children Folder[] @relation("FolderHierarchy")
   // Relaciones
-  owner    User   @relation(fields: [ownerId], references: [id])
+  owner    User    @relation(fields: [ownerId], references: [id])
   ownerId  Int
-  notes    Note[] // Notas dentro de esta carpeta
+  notes    Note[]  // Notas dentro de esta carpeta
 }
 
-// Modelo de Tablero (p.ej. tablero Kanban de tareas)
+// Modelo de Tablero (Kanban de tareas)
 model Board {
   id       Int     @id @default(autoincrement())
   title    String
@@ -62,13 +73,14 @@ model Board {
   tasks    Task[]  // Tareas en este tablero
 }
 
-// Modelo de Tarea (pertenece a un tablero)
+// Modelo de Tarea
 model Task {
   id          Int      @id @default(autoincrement())
   title       String
   description String?
-  done        Boolean  @default(false)    // estado de completado
+  done        Boolean  @default(false)
   dueDate     DateTime?
+  tags        Json?
   // Relaciones
   board       Board    @relation(fields: [boardId], references: [id])
   boardId     Int
@@ -76,40 +88,69 @@ model Task {
 
 // Modelo de Chat (conversación privada o grupal)
 model Chat {
-  id       Int       @id @default(autoincrement())
-  name     String?   // nombre del chat (usar para grupos, puede ser null en chat privado)
-  isGroup  Boolean   @default(false)
-  createdAt DateTime @default(now())
+  id         Int       @id @default(autoincrement())
+  name       String?   // nombre del chat (null si es chat privado)
+  isGroup    Boolean   @default(false)
+  createdAt  DateTime  @default(now())
   // Relaciones
-  users    User[]    @relation("UserChats")   // Participantes (usuarios) en el chat (relación muchos a muchos)
-  messages Message[] // Mensajes en el chat
+  users      User[]    @relation("UserChats")   // Participantes en el chat
+  messages   Message[] // Mensajes en el chat
 }
 
-// Modelo de Mensaje (dentro de un chat)
+// Modelo de Mensaje (mensaje de chat)
 model Message {
   id        Int      @id @default(autoincrement())
   content   String
-  fileUrl   String?  // (opcional) URL de archivo adjunto si lo hay
+  fileUrl   String?
   createdAt DateTime @default(now())
   // Relaciones
   sender    User    @relation("UserMessages", fields: [senderId], references: [id])
   senderId  Int
   chat      Chat    @relation(fields: [chatId], references: [id])
   chatId    Int
-  note      Note?   @relation(fields: [noteId], references: [id])  // (opcional) referencia a una nota enviada en el chat
+  note      Note?   @relation(fields: [noteId], references: [id])
   noteId    Int?
 }
 
 // Modelo de Notificación
 model Notification {
-  id        Int      @id @default(autoincrement())
-  message   String
-  type      String?   // tipo de notificación (ej: "chat", "task", "social")
-  isRead    Boolean   @default(false)
-  createdAt DateTime  @default(now())
-  scheduledFor DateTime? // (opcional) momento programado para notificación futura
+  id          Int      @id @default(autoincrement())
+  message     String
+  type        String?   // tipo de notificación (ej: "chat", "task", "social", "friend", "event")
+  isRead      Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  scheduledFor DateTime?
   // Relaciones
-  user      User     @relation(fields: [userId], references: [id])
-  userId    Int
-  // (Opcionalmente podríamos añadir referenceId si queremos vincular a una entidad, e.g. id de nota o tarea relacionada con la notificación)
+  user       User     @relation(fields: [userId], references: [id])
+  userId     Int
+  // (Opcional: referenceId para vincular a entidad relacionada)
+}
+
+// Modelo de Solicitud de Amistad
+model FriendRequest {
+  id        Int          @id @default(autoincrement())
+  from      User         @relation("RequestsSent", fields: [fromId], references: [id])
+  fromId    Int
+  to        User         @relation("RequestsReceived", fields: [toId], references: [id])
+  toId      Int
+  status    FriendStatus @default(PENDING)
+  createdAt DateTime     @default(now())
+}
+
+// Modelo de Evento del Calendario
+model Event {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String?
+  date        DateTime  @db.Date      // solo fecha (YYYY-MM-DD)
+  startTime   String?
+  endTime     String?
+  category    String?
+  color       String?
+  reminderMinutes Int?  @default(1440) // minutos de antelación para aviso (1440 = 1 día)
+  createdAt   DateTime  @default(now())
+  // Relaciones
+  owner       User      @relation("EventOwner", fields: [ownerId], references: [id])
+  ownerId     Int
+  participants User[]   @relation("EventParticipants")
 }

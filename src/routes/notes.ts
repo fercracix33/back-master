@@ -4,7 +4,7 @@ import { AuthRequest } from '../middleware/auth';
 
 const notesRouter = Router();
 
-// Obtener todas las notas públicas (explorar)
+// Obtener todas las notas públicas
 const getPublicNotes: RequestHandler = async (req, res): Promise<void> => {
   try {
     const publicNotes = await prisma.note.findMany({
@@ -21,7 +21,7 @@ const getPublicNotes: RequestHandler = async (req, res): Promise<void> => {
   }
 };
 
-// Obtener detalles de una nota pública por ID
+// Obtener una nota pública por ID
 const getPublicNoteById: RequestHandler = async (req, res): Promise<void> => {
   const noteId = Number(req.params.id);
   if (isNaN(noteId)) {
@@ -46,7 +46,7 @@ const getPublicNoteById: RequestHandler = async (req, res): Promise<void> => {
   }
 };
 
-// Crear una nueva nota (pública o privada)
+// Crear una nueva nota
 const createNote: RequestHandler = async (req, res): Promise<void> => {
   const userId = (req as AuthRequest).user?.userId || 0;
   const { title, content, isPublic, folderId } = req.body;
@@ -57,13 +57,21 @@ const createNote: RequestHandler = async (req, res): Promise<void> => {
   }
 
   try {
+    // Verificar carpeta si se proporciona
+    let folderIdValue: number | null = null;
+    if (folderId) {
+      const folder = await prisma.folder.findFirst({ where: { id: Number(folderId), ownerId: userId } });
+      if (folder) {
+        folderIdValue = folder.id;
+      }
+    }
     const newNote = await prisma.note.create({
       data: {
         title,
         content,
         isPublic: isPublic || false,
         authorId: userId,
-        folderId: folderId || null
+        folderId: folderIdValue
       }
     });
     res.status(201).json(newNote);
@@ -156,12 +164,19 @@ const copyNote: RequestHandler = async (req, res): Promise<void> => {
       return;
     }
 
+    // Verificar si se especificó carpeta destino
+    let targetFolderId: number | null = null;
+    if (req.body.folderId) {
+      const folderCheck = await prisma.folder.findFirst({ where: { id: Number(req.body.folderId), ownerId: userId } });
+      if (folderCheck) targetFolderId = folderCheck.id;
+    }
     const copied = await prisma.note.create({
       data: {
         title: original.title,
         content: original.content,
         isPublic: false,
-        authorId: userId
+        authorId: userId,
+        folderId: targetFolderId
       }
     });
 
@@ -181,7 +196,6 @@ const getMyNotes: RequestHandler = async (req, res): Promise<void> => {
       where: { authorId: userId, isPublic: false },
       include: { folder: true }
     });
-
     res.json(myNotes);
   } catch (error) {
     console.error('Error obteniendo tus notas:', error);
@@ -189,7 +203,6 @@ const getMyNotes: RequestHandler = async (req, res): Promise<void> => {
   }
 };
 
-// Asignar las funciones a las rutas
 notesRouter.get('/public', getPublicNotes);
 notesRouter.get('/public/:id', getPublicNoteById);
 notesRouter.post('/', createNote);
