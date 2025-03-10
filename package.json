@@ -12,6 +12,7 @@
   "dependencies": {
     "@prisma/client": "^6.4.1",
     "@supabase/supabase-js": "^2.0.0",
+    "back": "file:",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
