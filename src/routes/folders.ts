@@ -22,7 +22,7 @@ foldersRouter.post('/', (async (req: Request, res: Response) => {
     const newFolder = await prisma.folder.create({
       data: {
         name,
-        userId,
+        ownerId: userId,
         parentId: parentId ? Number(parentId) : null
       }
     });
@@ -44,7 +44,7 @@ foldersRouter.get('/', (async (req: Request, res: Response) => {
 
   try {
     const folders = await prisma.folder.findMany({
-      where: { userId },
+      where: { ownerId: userId },
       include: { notes: true }
     });
 
@@ -70,7 +70,7 @@ foldersRouter.patch('/:id', (async (req: Request, res: Response) => {
       where: { id: folderId }
     });
 
-    if (!folder || folder.userId !== userId) {
+    if (!folder || folder.ownerId !== userId) {
       return res.status(404).json({ error: 'Carpeta no encontrada o sin permisos.' });
     }
 
@@ -110,7 +110,7 @@ foldersRouter.delete('/:id', (async (req: Request, res: Response) => {
   try {
     const folder = await prisma.folder.findUnique({ where: { id: folderId } });
 
-    if (!folder || folder.userId !== userId) {
+    if (!folder || folder.ownerId !== userId) {
       return res.status(404).json({ error: 'Carpeta no encontrada o sin permisos.' });
     }
 
