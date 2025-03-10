@@ -1,8 +1,13 @@
 import { Router, Request, Response, RequestHandler } from 'express';
 import prisma from '../prisma/client';
 import { AuthRequest } from '../middleware/auth';
-
+import fs from 'fs-extra';
+import path from 'path';
+import { supabase } from '../index';
 const foldersRouter = Router();
+
+// Definir ruta de almacenamiento local
+const localStoragePath = process.env.LOCAL_STORAGE_PATH || path.join(__dirname, '..', 'notas-locales');
 
 // Crear una nueva carpeta
 foldersRouter.post('/', (async (req: Request, res: Response) => {
@@ -21,6 +26,11 @@ foldersRouter.post('/', (async (req: Request, res: Response) => {
         parentId: parentId ? Number(parentId) : null
       }
     });
+
+    // Crear carpeta localmente
+    const folderPath = path.join(localStoragePath, name);
+    fs.ensureDirSync(folderPath);
+
     res.status(201).json(newFolder);
   } catch (error) {
     console.error('Error al crear carpeta:', error);
@@ -37,6 +47,7 @@ foldersRouter.get('/', (async (req: Request, res: Response) => {
       where: { userId },
       include: { notes: true }
     });
+
     res.json(folders);
   } catch (error) {
     console.error('Error al obtener carpetas:', error);
@@ -71,6 +82,15 @@ foldersRouter.patch('/:id', (async (req: Request, res: Response) => {
       }
     });
 
+    // Renombrar carpeta localmente
+    if (name && name !== folder.name) {
+      const oldPath = path.join(localStoragePath, folder.name);
+      const newPath = path.join(localStoragePath, name);
+      if (fs.existsSync(oldPath)) {
+        fs.renameSync(oldPath, newPath);
+      }
+    }
+
     res.json(updatedFolder);
   } catch (error) {
     console.error('Error al actualizar carpeta:', error);
@@ -92,6 +112,12 @@ foldersRouter.delete('/:id', (async (req: Request, res: Response) => {
 
     if (!folder || folder.userId !== userId) {
       return res.status(404).json({ error: 'Carpeta no encontrada o sin permisos.' });
+    }
+
+    // Eliminar carpeta localmente
+    const folderPath = path.join(localStoragePath, folder.name);
+    if (fs.existsSync(folderPath)) {
+      fs.removeSync(folderPath);
     }
 
     await prisma.folder.delete({ where: { id: folderId } });

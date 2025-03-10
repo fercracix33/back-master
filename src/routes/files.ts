@@ -1,23 +1,15 @@
 import { Router, Request, Response, RequestHandler } from 'express';
 import multer, { Multer } from 'multer';
-import { createClient } from '@supabase/supabase-js';
-import fs from 'fs';
+import { supabase } from '../index';
+import fs from 'fs-extra';
 import path from 'path';
 import { AuthRequest } from '../middleware/auth';
-
 const filesRouter = Router();
 const upload: Multer = multer({ storage: multer.memoryStorage() });
 
-// Configurar cliente de Supabase si hay credenciales
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_KEY || '';
-let supabaseClient = null;
-
-if (supabaseUrl && supabaseKey) {
-  supabaseClient = createClient(supabaseUrl, supabaseKey);
-}
-
 const bucketName = process.env.SUPABASE_BUCKET || 'uploads';
+const localStoragePath = process.env.LOCAL_STORAGE_PATH || path.join(__dirname, '..', '..', 'uploads');
+fs.ensureDirSync(localStoragePath);
 
 // Endpoint de subida de archivo
 filesRouter.post('/', upload.single('file'), (async (req: Request, res: Response) => {
@@ -40,26 +32,21 @@ filesRouter.post('/', upload.single('file'), (async (req: Request, res: Response
 
     let publicUrl: string | undefined;
 
-    if (supabaseClient) {
-      const { error: uploadError } = await supabaseClient.storage
-        .from(bucketName)
-        .upload(uniqueName, file.buffer, { contentType: file.mimetype });
+    // Subir a Supabase
+    const { error: uploadError } = await supabase.storage
+      .from(bucketName)
+      .upload(uniqueName, file.buffer, { contentType: file.mimetype });
 
-      if (!uploadError) {
-        const { data } = supabaseClient.storage.from(bucketName).getPublicUrl(uniqueName);
-        publicUrl = data.publicUrl;
-      } else {
-        console.error('Error al subir a Supabase:', uploadError);
-      }
+    if (!uploadError) {
+      const { data } = supabase.storage.from(bucketName).getPublicUrl(uniqueName);
+      publicUrl = data.publicUrl;
+    } else {
+      console.error('Error al subir a Supabase:', uploadError);
     }
 
+    // Guardar localmente si no se pudo subir a Supabase
     if (!publicUrl) {
-      // Guardar localmente si no se pudo usar Supabase
-      const uploadDir = path.join(__dirname, '..', '..', 'uploads');
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-      }
-      const filePath = path.join(uploadDir, uniqueName);
+      const filePath = path.join(localStoragePath, uniqueName);
       fs.writeFileSync(filePath, file.buffer);
 
       const protocol = req.protocol;

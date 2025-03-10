@@ -4,7 +4,9 @@ import cors from 'cors';
 import { Server as SocketIOServer } from 'socket.io';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs-extra';
 import prisma from './prisma/client';
+import { createClient } from '@supabase/supabase-js';
 import authRouter from './routes/auth';
 import notesRouter from './routes/notes';
 import chatRouter from './routes/chat';
@@ -19,6 +21,12 @@ import filesRouter from './routes/files';
 
 dotenv.config(); // Cargar variables de entorno
 
+// 📌 Configurar Supabase
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.SUPABASE_KEY || '';
+const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET || 'uploads';
+export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
 const app: Application = express();
 const server = http.createServer(app);
 const io = new SocketIOServer(server, {
@@ -27,7 +35,9 @@ const io = new SocketIOServer(server, {
 app.set('io', io);
 
 // 📌 Middleware global
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+const localStoragePath = process.env.LOCAL_STORAGE_PATH || path.join(__dirname, '..', 'notas-locales');
+fs.ensureDirSync(localStoragePath);
+app.use('/uploads', express.static(localStoragePath));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(
@@ -97,64 +107,6 @@ io.on('connection', (socket) => {
 
   socket.on('joinChat', (chatId: string) => {
     socket.join(`chat_${chatId}`);
-  });
-
-  socket.on('chatMessage', async (data: { chatId: number; content: string; noteId?: number; fileUrl?: string }) => {
-    try {
-      const newMessage = await prisma.message.create({
-        data: {
-          content: data.content,
-          chatId: data.chatId,
-          senderId: socket.data.userId,
-          noteId: data.noteId || null,
-          fileUrl: data.fileUrl || null,
-        },
-        include: { sender: true },
-      });
-
-      io.to(`chat_${data.chatId}`).emit('chatMessage', newMessage);
-      // Notificación en tiempo real para mensajes nuevos
-      try {
-        const chat = await prisma.chat.findUnique({
-          where: { id: data.chatId },
-          include: { users: { select: { id: true } }, isGroup: true, name: true }
-        });
-        if (chat) {
-          const senderId = socket.data.userId;
-          const roomName = `chat_${data.chatId}`;
-          const room = io.sockets.adapter.rooms.get(roomName);
-          const onlineInChatUserIds = new Set<number>();
-          if (room) {
-            for (const socketId of room) {
-              const sock = io.sockets.sockets.get(socketId);
-              if (sock && sock.data.userId) {
-                onlineInChatUserIds.add(sock.data.userId);
-              }
-            }
-          }
-          for (const user of chat.users) {
-            if (user.id !== senderId) {
-              if (!onlineInChatUserIds.has(user.id)) {
-                const messageText = chat.isGroup && chat.name ? `Nuevo mensaje en ${chat.name}` : `Nuevo mensaje de ${newMessage.sender.name}`;
-                const notification = await prisma.notification.create({
-                  data: {
-                    userId: user.id,
-                    message: messageText,
-                    type: 'chat'
-                  }
-                });
-                io.to(`user_${user.id}`).emit('notification', notification);
-              }
-            }
-          }
-        }
-      } catch (err) {
-        console.error('Error al crear notificación de chat:', err);
-      }
-    } catch (error) {
-      console.error('Error al enviar mensaje:', error);
-      socket.emit('error', { message: 'No se pudo enviar el mensaje.' });
-    }
   });
 
   socket.on('disconnect', () => {
