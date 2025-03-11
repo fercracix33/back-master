@@ -83,7 +83,7 @@ app.use('/api/friends', authenticateToken, friendsRouter);
 app.use('/api/events', authenticateToken, eventsRouter);
 app.use('/api/folders', authenticateToken, foldersRouter);
 app.use('/api/upload', authenticateToken, filesRouter);
-app.use('/files', authenticateToken, filesRouter);
+app.use('/api/files', authenticateToken, filesRouter);
 
 
 // 📌 Rutas no encontradas
