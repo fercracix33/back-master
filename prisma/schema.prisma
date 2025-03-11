@@ -31,6 +31,7 @@ model User {
   friendRequestsReceived FriendRequest[] @relation("RequestsReceived")
   ownedEvents   Event[]          @relation("EventOwner")
   events        Event[]          @relation("EventParticipants")
+  files         File[]           // ✅ Archivos subidos por el usuario
 }
 
 // Modelo de Nota
@@ -51,17 +52,34 @@ model Note {
 }
 
 // Modelo de Carpeta (para organizar notas del usuario)
+// Modelo de Carpeta (para organizar archivos y notas)
 model Folder {
-  id       Int     @id @default(autoincrement())
+  id       Int      @id @default(autoincrement())
   name     String
-  parent   Folder? @relation("FolderHierarchy", fields: [parentId], references: [id])
+  parent   Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id])
   parentId Int?
   children Folder[] @relation("FolderHierarchy")
   // Relaciones
-  owner    User    @relation(fields: [ownerId], references: [id])
+  owner    User     @relation(fields: [ownerId], references: [id])
   ownerId  Int
-  notes    Note[]  // Notas dentro de esta carpeta
+  notes    Note[]   // Notas dentro de esta carpeta
+  files    File[]   // Archivos dentro de esta carpeta
 }
+
+// Modelo de Archivo
+model File {
+  id         Int      @id @default(autoincrement())
+  name       String
+  path       String   // Ruta de almacenamiento
+  size       Int      // Tamaño en bytes
+  mimeType   String   // Tipo MIME (ej. "image/png", "application/pdf")
+  createdAt  DateTime @default(now())
+  folderId   Int?     // Puede estar en una carpeta o en la raíz
+  folder     Folder?  @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  ownerId    Int
+  owner      User     @relation(fields: [ownerId], references: [id]) // ✅ Relación con el usuario
+}
+
 
 // Modelo de Tablero (Kanban de tareas)
 model Board {
