@@ -13,10 +13,10 @@ const bucketName = process.env.SUPABASE_BUCKET || 'uploads';
 const localStoragePath = process.env.LOCAL_STORAGE_PATH || path.join(__dirname, '..', '..', 'uploads');
 fs.ensureDirSync(localStoragePath);
 
-// Endpoint de subida de archivo con asociación a una carpeta
+// 📌 Endpoint para subir archivos
 filesRouter.post('/', upload.single('file'), (async (req: Request, res: Response) => {
   const userId: number = (req as AuthRequest).user?.userId ?? 0;
-  const { folderId } = req.body; // Permitir asociación opcional con una carpeta
+  const { folderId } = req.body;
 
   if (!userId) {
     return res.status(401).json({ error: 'No autenticado.' });
@@ -47,7 +47,7 @@ filesRouter.post('/', upload.single('file'), (async (req: Request, res: Response
       console.error('Error al subir a Supabase:', uploadError);
     }
 
-    // Guardar archivo en la base de datos
+    // Guardar en la base de datos
     const newFile = await prisma.file.create({
       data: {
         name: originalName,
@@ -63,6 +63,50 @@ filesRouter.post('/', upload.single('file'), (async (req: Request, res: Response
   } catch (error) {
     console.error('Error al almacenar archivo:', error);
     res.status(500).json({ error: 'Error interno al almacenar el archivo.' });
+  }
+}) as RequestHandler);
+
+// 📌 Endpoint para obtener la lista de archivos
+filesRouter.get('/', (async (req: Request, res: Response) => {
+  try {
+    const files = await prisma.file.findMany();
+
+    // Generar URLs de Supabase para cada archivo
+    const filesWithUrls = files.map((file: { path: string }) => ({
+      ...file,
+      url: supabase.storage.from(bucketName).getPublicUrl(file.path).data.publicUrl
+    }));
+    res.json(filesWithUrls);
+  } catch (error) {
+    console.error('Error al obtener archivos:', error);
+    res.status(500).json({ error: 'Error interno al obtener archivos.' });
+  }
+}) as RequestHandler);
+
+// 📌 Endpoint para obtener un archivo por ID
+filesRouter.get('/:id', (async (req: Request, res: Response) => {
+  const fileId = Number(req.params.id);
+
+  if (isNaN(fileId)) {
+    return res.status(400).json({ error: 'ID de archivo inválido.' });
+  }
+
+  try {
+    const file = await prisma.file.findUnique({
+      where: { id: fileId }
+    });
+
+    if (!file) {
+      return res.status(404).json({ error: 'Archivo no encontrado.' });
+    }
+
+    // Obtener la URL pública desde Supabase
+    const publicUrl = supabase.storage.from(bucketName).getPublicUrl(file.path).data.publicUrl;
+
+    res.json({ ...file, url: publicUrl });
+  } catch (error) {
+    console.error('Error al obtener archivo:', error);
+    res.status(500).json({ error: 'Error interno al obtener el archivo.' });
   }
 }) as RequestHandler);
 
