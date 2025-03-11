@@ -83,6 +83,8 @@ app.use('/api/friends', authenticateToken, friendsRouter);
 app.use('/api/events', authenticateToken, eventsRouter);
 app.use('/api/folders', authenticateToken, foldersRouter);
 app.use('/api/upload', authenticateToken, filesRouter);
+app.use('/files', authenticateToken, filesRouter);
+
 
 // 📌 Rutas no encontradas
 app.use((req, res, next) => {
