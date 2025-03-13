@@ -13,11 +13,10 @@ const bucketName = process.env.SUPABASE_BUCKET || 'uploads';
 const localStoragePath = process.env.LOCAL_STORAGE_PATH || path.join(__dirname, '..', '..', 'uploads');
 fs.ensureDirSync(localStoragePath);
 
-// 📌 Endpoint para subir archivos
+// 📌 Subir archivos (solo gestión de archivos, sin lógica de notas o carpetas)
 filesRouter.post('/', upload.single('file'), (async (req: Request, res: Response) => {
   const userId: number = (req as AuthRequest).user?.userId ?? 0;
-  const { folderId } = req.body;
-
+  
   if (!userId) {
     return res.status(401).json({ error: 'No autenticado.' });
   }
@@ -29,9 +28,8 @@ filesRouter.post('/', upload.single('file'), (async (req: Request, res: Response
   try {
     const file = req.file;
     const originalName = file.originalname;
-    const timestamp = Date.now();
     const ext = path.extname(originalName) || '';
-    const uniqueName = `user_${userId}_${timestamp}${ext}`;
+    const uniqueName = `user_${userId}_${Date.now()}${ext}`;
 
     let publicUrl: string | undefined;
 
@@ -40,12 +38,13 @@ filesRouter.post('/', upload.single('file'), (async (req: Request, res: Response
       .from(bucketName)
       .upload(uniqueName, file.buffer, { contentType: file.mimetype });
 
-    if (!uploadError) {
-      const { data } = supabase.storage.from(bucketName).getPublicUrl(uniqueName);
-      publicUrl = data.publicUrl;
-    } else {
+    if (uploadError) {
       console.error('Error al subir a Supabase:', uploadError);
+      return res.status(500).json({ error: 'Error al subir el archivo.' });
     }
+
+    const { data } = supabase.storage.from(bucketName).getPublicUrl(uniqueName);
+    publicUrl = data.publicUrl;
 
     // Guardar en la base de datos
     const newFile = await prisma.file.create({
@@ -54,7 +53,6 @@ filesRouter.post('/', upload.single('file'), (async (req: Request, res: Response
         path: uniqueName,
         size: file.size,
         mimeType: file.mimetype,
-        folderId: folderId ? Number(folderId) : null,
         ownerId: userId,
       }
     });
@@ -66,16 +64,21 @@ filesRouter.post('/', upload.single('file'), (async (req: Request, res: Response
   }
 }) as RequestHandler);
 
-// 📌 Endpoint para obtener la lista de archivos
+// 📌 Obtener todos los archivos de un usuario
 filesRouter.get('/', (async (req: Request, res: Response) => {
+  const userId: number = (req as AuthRequest).user?.userId ?? 0;
+
   try {
-    const files = await prisma.file.findMany();
+    const files = await prisma.file.findMany({
+      where: { ownerId: userId }
+    });
 
     // Generar URLs de Supabase para cada archivo
     const filesWithUrls = files.map((file: { path: string }) => ({
       ...file,
       url: supabase.storage.from(bucketName).getPublicUrl(file.path).data.publicUrl
     }));
+
     res.json(filesWithUrls);
   } catch (error) {
     console.error('Error al obtener archivos:', error);
@@ -83,8 +86,9 @@ filesRouter.get('/', (async (req: Request, res: Response) => {
   }
 }) as RequestHandler);
 
-// 📌 Endpoint para obtener un archivo por ID
+// 📌 Obtener un archivo por ID
 filesRouter.get('/:id', (async (req: Request, res: Response) => {
+  const userId: number = (req as AuthRequest).user?.userId ?? 0;
   const fileId = Number(req.params.id);
 
   if (isNaN(fileId)) {
@@ -92,12 +96,12 @@ filesRouter.get('/:id', (async (req: Request, res: Response) => {
   }
 
   try {
-    const file = await prisma.file.findUnique({
-      where: { id: fileId }
+    const file = await prisma.file.findFirst({
+      where: { id: fileId, ownerId: userId }
     });
 
     if (!file) {
-      return res.status(404).json({ error: 'Archivo no encontrado.' });
+      return res.status(404).json({ error: 'Archivo no encontrado o no tienes permiso para verlo.' });
     }
 
     // Obtener la URL pública desde Supabase
@@ -110,10 +114,10 @@ filesRouter.get('/:id', (async (req: Request, res: Response) => {
   }
 }) as RequestHandler);
 
-// 📌 Endpoint para eliminar un archivo por ID
+// 📌 Eliminar un archivo por ID
 filesRouter.delete('/:id', (async (req: Request, res: Response) => {
-  const fileId = Number(req.params.id);
   const userId: number = (req as AuthRequest).user?.userId ?? 0;
+  const fileId = Number(req.params.id);
 
   if (isNaN(fileId)) {
     return res.status(400).json({ error: 'ID de archivo inválido.' });
@@ -121,17 +125,12 @@ filesRouter.delete('/:id', (async (req: Request, res: Response) => {
 
   try {
     // Buscar el archivo en la base de datos
-    const file = await prisma.file.findUnique({
-      where: { id: fileId }
+    const file = await prisma.file.findFirst({
+      where: { id: fileId, ownerId: userId }
     });
 
     if (!file) {
-      return res.status(404).json({ error: 'Archivo no encontrado.' });
-    }
-
-    // Verificar que el usuario es el dueño del archivo
-    if (file.ownerId !== userId) {
-      return res.status(403).json({ error: 'No tienes permiso para eliminar este archivo.' });
+      return res.status(404).json({ error: 'Archivo no encontrado o no tienes permiso para eliminarlo.' });
     }
 
     // Eliminar de Supabase
@@ -145,9 +144,7 @@ filesRouter.delete('/:id', (async (req: Request, res: Response) => {
     }
 
     // Eliminar de la base de datos
-    await prisma.file.delete({
-      where: { id: fileId }
-    });
+    await prisma.file.delete({ where: { id: fileId } });
 
     res.json({ message: 'Archivo eliminado correctamente.' });
   } catch (error) {

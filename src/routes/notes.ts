@@ -1,68 +1,85 @@
-import { Router, Response, RequestHandler } from 'express';
+import { Router, Request, Response, RequestHandler } from 'express';
 import prisma from '../prisma/client';
 import { AuthRequest } from '../middleware/auth';
-import fs from 'fs-extra';
-import path from 'path';
-import { supabase } from '../index';
 
 const notesRouter = Router();
-const localStoragePath = process.env.LOCAL_STORAGE_PATH || path.join(__dirname, '..', '..', 'notas-locales');
-fs.ensureDirSync(localStoragePath);
 
-// Obtener todas las notas públicas
-const getPublicNotes: RequestHandler = async (req, res): Promise<void> => {
+// 📌 Obtener todas las notas del usuario (privadas y públicas propias)
+notesRouter.get('/', (async (req: Request, res: Response) => {
+  const userId: number = (req as AuthRequest).user?.userId ?? 0;
+
+  try {
+    const notes = await prisma.note.findMany({
+      where: { authorId: userId },
+      include: { folder: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json(notes);
+  } catch (error) {
+    console.error('Error al obtener notas:', error);
+    res.status(500).json({ error: 'Error interno al obtener notas' });
+  }
+}) as RequestHandler);
+
+// 📌 Obtener todas las notas públicas (Wuolah-like, disponible para todos)
+notesRouter.get('/public', (async (_req: Request, res: Response) => {
   try {
     const publicNotes = await prisma.note.findMany({
       where: { isPublic: true },
       include: {
-        author: { select: { name: true } }
+        author: { select: { id: true, name: true } }, // Mostrar nombre y ID del autor
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
+
     res.json(publicNotes);
   } catch (error) {
     console.error('Error obteniendo notas públicas:', error);
-    res.status(500).json({ error: 'Error obteniendo notas públicas' });
+    res.status(500).json({ error: 'Error interno al obtener notas públicas' });
   }
-};
+}) as RequestHandler);
 
-// Obtener una nota pública por ID
-const getPublicNoteById: RequestHandler = async (req, res): Promise<void> => {
+// 📌 Obtener una nota pública por ID (disponible para todos)
+notesRouter.get('/public/:id', (async (req: Request, res: Response) => {
   const noteId = Number(req.params.id);
+
   if (isNaN(noteId)) {
-    res.status(400).json({ error: 'ID de nota inválido.' });
-    return;
+    return res.status(400).json({ error: 'ID de nota inválido.' });
   }
+
   try {
     const note = await prisma.note.findFirst({
       where: { id: noteId, isPublic: true },
       include: {
-        author: { select: { name: true, id: true } }
-      }
+        author: { select: { id: true, name: true } },
+      },
     });
+
     if (!note) {
-      res.status(404).json({ error: 'Nota no encontrada o no es pública' });
-      return;
+      return res.status(404).json({ error: 'Nota no encontrada o no es pública' });
     }
+
     res.json(note);
   } catch (error) {
-    console.error('Error obteniendo la nota:', error);
-    res.status(500).json({ error: 'Error obteniendo la nota' });
+    console.error('Error obteniendo la nota pública:', error);
+    res.status(500).json({ error: 'Error interno al obtener la nota pública' });
   }
-};
+}) as RequestHandler);
 
-// Crear una nueva nota con almacenamiento híbrido
-const createNote: RequestHandler = async (req, res): Promise<void> => {
-  const userId = (req as AuthRequest).user?.userId || 0;
+// 📌 Crear una nueva nota (pública o privada)
+notesRouter.post('/', (async (req: Request, res: Response) => {
+  const userId: number = (req as AuthRequest).user?.userId ?? 0;
   const { title, content, isPublic, folderId } = req.body;
 
   if (!title || !content) {
-    res.status(400).json({ error: 'Título y contenido son requeridos.' });
-    return;
+    return res.status(400).json({ error: 'Título y contenido son requeridos.' });
   }
 
   try {
     let folderIdValue: number | null = null;
+    
+    // Verificar si la carpeta existe y pertenece al usuario
     if (folderId) {
       const folder = await prisma.folder.findFirst({ where: { id: Number(folderId), ownerId: userId } });
       if (folder) {
@@ -70,39 +87,115 @@ const createNote: RequestHandler = async (req, res): Promise<void> => {
       }
     }
 
+    // Crear la nota en la base de datos
     const newNote = await prisma.note.create({
       data: {
         title,
         content,
         isPublic: isPublic || false,
         authorId: userId,
-        folderId: folderIdValue
+        folderId: folderIdValue,
       }
     });
-
-    // Guardar la nota localmente
-    const folderPath = folderIdValue ? path.join(localStoragePath, `folder_${folderIdValue}`) : localStoragePath;
-    fs.ensureDirSync(folderPath);
-    const filePath = path.join(folderPath, `${title}.md`);
-    fs.writeFileSync(filePath, content);
-
-    // Subir la nota a Supabase
-    const { error: uploadError } = await supabase.storage
-      .from(process.env.SUPABASE_BUCKET || 'notas')
-      .upload(`notas/${title}.md`, content, { contentType: 'text/markdown' });
-
-    if (uploadError) {
-      console.error('Error subiendo la nota a Supabase:', uploadError);
-    }
 
     res.status(201).json(newNote);
   } catch (error) {
     console.error('Error al crear la nota:', error);
     res.status(500).json({ error: 'No se pudo crear la nota' });
   }
-};
+}) as RequestHandler);
 
-notesRouter.get('/public', getPublicNotes);
-notesRouter.get('/public/:id', getPublicNoteById);
-notesRouter.post('/', createNote);
+// 📌 Editar una nota (privada o pública)
+notesRouter.patch('/:id', (async (req: Request, res: Response) => {
+  const userId: number = (req as AuthRequest).user?.userId ?? 0;
+  const noteId = Number(req.params.id);
+  const { title, content, isPublic, folderId } = req.body;
+
+  if (isNaN(noteId)) {
+    return res.status(400).json({ error: 'ID de nota inválido.' });
+  }
+
+  try {
+    const note = await prisma.note.findFirst({
+      where: { id: noteId, authorId: userId },
+    });
+
+    if (!note) {
+      return res.status(404).json({ error: 'Nota no encontrada o no tienes acceso.' });
+    }
+
+    let folderIdValue: number | null = note.folderId;
+    
+    // Verificar si la carpeta existe y pertenece al usuario
+    if (folderId) {
+      const folder = await prisma.folder.findFirst({ where: { id: Number(folderId), ownerId: userId } });
+      if (folder) {
+        folderIdValue = folder.id;
+      }
+    }
+
+    // Actualizar la nota
+    const updatedNote = await prisma.note.update({
+      where: { id: noteId },
+      data: { title, content, isPublic, folderId: folderIdValue }
+    });
+
+    res.json(updatedNote);
+  } catch (error) {
+    console.error('Error al actualizar nota:', error);
+    res.status(500).json({ error: 'Error interno al actualizar la nota' });
+  }
+}) as RequestHandler);
+
+// 📌 Eliminar una nota
+notesRouter.delete('/:id', (async (req: Request, res: Response) => {
+  const userId: number = (req as AuthRequest).user?.userId ?? 0;
+  const noteId = Number(req.params.id);
+
+  if (isNaN(noteId)) {
+    return res.status(400).json({ error: 'ID de nota inválido.' });
+  }
+
+  try {
+    const note = await prisma.note.findFirst({
+      where: { id: noteId, authorId: userId },
+    });
+
+    if (!note) {
+      return res.status(404).json({ error: 'Nota no encontrada o no tienes acceso.' });
+    }
+
+    // Eliminar la nota de la base de datos
+    await prisma.note.delete({ where: { id: noteId } });
+
+    res.json({ message: 'Nota eliminada correctamente.' });
+  } catch (error) {
+    console.error('Error al eliminar nota:', error);
+    res.status(500).json({ error: 'Error interno al eliminar la nota' });
+  }
+}) as RequestHandler);
+
+// 📌 Dar "Me gusta" a una nota pública
+notesRouter.post('/public/:id/like', (async (req: Request, res: Response) => {
+  const noteId = Number(req.params.id);
+
+  if (isNaN(noteId)) {
+    return res.status(400).json({ error: 'ID de nota inválido.' });
+  }
+
+  try {
+    const updatedNote = await prisma.note.update({
+      where: { id: noteId, isPublic: true },
+      data: {
+        likes: { increment: 1 } // Incrementar el contador de likes
+      }
+    });
+
+    res.json({ message: 'Me gusta agregado.', likes: updatedNote.likes });
+  } catch (error) {
+    console.error('Error al dar like a la nota:', error);
+    res.status(500).json({ error: 'Error interno al dar like a la nota' });
+  }
+}) as RequestHandler);
+
 export default notesRouter;
