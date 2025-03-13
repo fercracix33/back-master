@@ -110,4 +110,50 @@ filesRouter.get('/:id', (async (req: Request, res: Response) => {
   }
 }) as RequestHandler);
 
+// 📌 Endpoint para eliminar un archivo por ID
+filesRouter.delete('/:id', (async (req: Request, res: Response) => {
+  const fileId = Number(req.params.id);
+  const userId: number = (req as AuthRequest).user?.userId ?? 0;
+
+  if (isNaN(fileId)) {
+    return res.status(400).json({ error: 'ID de archivo inválido.' });
+  }
+
+  try {
+    // Buscar el archivo en la base de datos
+    const file = await prisma.file.findUnique({
+      where: { id: fileId }
+    });
+
+    if (!file) {
+      return res.status(404).json({ error: 'Archivo no encontrado.' });
+    }
+
+    // Verificar que el usuario es el dueño del archivo
+    if (file.ownerId !== userId) {
+      return res.status(403).json({ error: 'No tienes permiso para eliminar este archivo.' });
+    }
+
+    // Eliminar de Supabase
+    const { error: deleteError } = await supabase.storage
+      .from(bucketName)
+      .remove([file.path]);
+
+    if (deleteError) {
+      console.error('Error al eliminar archivo de Supabase:', deleteError);
+      return res.status(500).json({ error: 'Error al eliminar el archivo de Supabase.' });
+    }
+
+    // Eliminar de la base de datos
+    await prisma.file.delete({
+      where: { id: fileId }
+    });
+
+    res.json({ message: 'Archivo eliminado correctamente.' });
+  } catch (error) {
+    console.error('Error al eliminar archivo:', error);
+    res.status(500).json({ error: 'Error interno al eliminar el archivo.' });
+  }
+}) as RequestHandler);
+
 export default filesRouter;
