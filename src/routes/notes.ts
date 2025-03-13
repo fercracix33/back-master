@@ -147,6 +147,29 @@ notesRouter.patch('/:id', (async (req: Request, res: Response) => {
   }
 }) as RequestHandler);
 
+// 📌 Mover una nota a otra carpeta
+notesRouter.put('/:id/move', (async (req: Request, res: Response) => {
+  const userId: number = (req as AuthRequest).user?.userId ?? 0;
+  const noteId = Number(req.params.id);
+  const { newFolderId } = req.body;
+
+  if (isNaN(noteId)) {
+    return res.status(400).json({ error: 'ID de nota inválido.' });
+  }
+
+  try {
+    const updatedNote = await prisma.note.update({
+      where: { id: noteId, authorId: userId },
+      data: { folderId: newFolderId ? Number(newFolderId) : null },
+    });
+
+    res.json(updatedNote);
+  } catch (error) {
+    console.error('Error al mover la nota:', error);
+    res.status(500).json({ error: 'Error interno al mover la nota' });
+  }
+}) as RequestHandler);
+
 // 📌 Eliminar una nota
 notesRouter.delete('/:id', (async (req: Request, res: Response) => {
   const userId: number = (req as AuthRequest).user?.userId ?? 0;
@@ -157,44 +180,11 @@ notesRouter.delete('/:id', (async (req: Request, res: Response) => {
   }
 
   try {
-    const note = await prisma.note.findFirst({
-      where: { id: noteId, authorId: userId },
-    });
-
-    if (!note) {
-      return res.status(404).json({ error: 'Nota no encontrada o no tienes acceso.' });
-    }
-
-    // Eliminar la nota de la base de datos
-    await prisma.note.delete({ where: { id: noteId } });
-
+    await prisma.note.delete({ where: { id: noteId, authorId: userId } });
     res.json({ message: 'Nota eliminada correctamente.' });
   } catch (error) {
     console.error('Error al eliminar nota:', error);
     res.status(500).json({ error: 'Error interno al eliminar la nota' });
-  }
-}) as RequestHandler);
-
-// 📌 Dar "Me gusta" a una nota pública
-notesRouter.post('/public/:id/like', (async (req: Request, res: Response) => {
-  const noteId = Number(req.params.id);
-
-  if (isNaN(noteId)) {
-    return res.status(400).json({ error: 'ID de nota inválido.' });
-  }
-
-  try {
-    const updatedNote = await prisma.note.update({
-      where: { id: noteId, isPublic: true },
-      data: {
-        likes: { increment: 1 } // Incrementar el contador de likes
-      }
-    });
-
-    res.json({ message: 'Me gusta agregado.', likes: updatedNote.likes });
-  } catch (error) {
-    console.error('Error al dar like a la nota:', error);
-    res.status(500).json({ error: 'Error interno al dar like a la nota' });
   }
 }) as RequestHandler);
 

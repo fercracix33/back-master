@@ -13,10 +13,10 @@ const bucketName = process.env.SUPABASE_BUCKET || 'uploads';
 const localStoragePath = process.env.LOCAL_STORAGE_PATH || path.join(__dirname, '..', '..', 'uploads');
 fs.ensureDirSync(localStoragePath);
 
-// 📌 Subir archivos (solo gestión de archivos, sin lógica de notas o carpetas)
+// 📌 Subir archivos
 filesRouter.post('/', upload.single('file'), (async (req: Request, res: Response) => {
   const userId: number = (req as AuthRequest).user?.userId ?? 0;
-  
+
   if (!userId) {
     return res.status(401).json({ error: 'No autenticado.' });
   }
@@ -150,6 +150,39 @@ filesRouter.delete('/:id', (async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error al eliminar archivo:', error);
     res.status(500).json({ error: 'Error interno al eliminar el archivo.' });
+  }
+}) as RequestHandler);
+
+// 📌 Mover un archivo a otra carpeta
+filesRouter.put('/:id/move', (async (req: Request, res: Response) => {
+  const userId: number = (req as AuthRequest).user?.userId ?? 0;
+  const fileId = Number(req.params.id);
+  const { newFolderId } = req.body;
+
+  if (isNaN(fileId)) {
+    return res.status(400).json({ error: 'ID de archivo inválido.' });
+  }
+
+  try {
+    // Verificar que el archivo pertenece al usuario
+    const file = await prisma.file.findFirst({
+      where: { id: fileId, ownerId: userId }
+    });
+
+    if (!file) {
+      return res.status(404).json({ error: 'Archivo no encontrado o no tienes permiso para moverlo.' });
+    }
+
+    // Actualizar la carpeta del archivo
+    const updatedFile = await prisma.file.update({
+      where: { id: fileId },
+      data: { folderId: newFolderId ? Number(newFolderId) : null },
+    });
+
+    res.json(updatedFile);
+  } catch (error) {
+    console.error('Error al mover archivo:', error);
+    res.status(500).json({ error: 'Error interno al mover archivo.' });
   }
 }) as RequestHandler);
 
