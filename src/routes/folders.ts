@@ -187,4 +187,54 @@ foldersRouter.delete('/:id', (async (req: Request, res: Response) => {
 }) as RequestHandler);
 
 
+foldersRouter.put('/:id/move', (async (req: Request, res: Response) => {
+  const userId: number = (req as AuthRequest).user?.userId ?? 0;
+  const folderId = Number(req.params.id);
+  const { newParentFolderId } = req.body;
+
+  if (isNaN(folderId)) {
+    return res.status(400).json({ error: 'ID de carpeta inválido.' });
+  }
+
+  try {
+    // Verificar que la carpeta pertenece al usuario
+    const folder = await prisma.folder.findFirst({
+      where: { id: folderId, ownerId: userId },
+    });
+
+    if (!folder) {
+      return res.status(404).json({ error: 'Carpeta no encontrada o no tienes acceso.' });
+    }
+
+    // Verificar si la carpeta destino existe y pertenece al usuario
+    if (newParentFolderId) {
+      const parentFolder = await prisma.folder.findFirst({
+        where: { id: Number(newParentFolderId), ownerId: userId },
+      });
+
+      if (!parentFolder) {
+        return res.status(400).json({ error: 'La carpeta destino no existe o no tienes acceso.' });
+      }
+
+      // Prevenir mover una carpeta dentro de sí misma
+      if (folderId === newParentFolderId) {
+        return res.status(400).json({ error: 'No puedes mover una carpeta dentro de sí misma.' });
+      }
+    }
+
+    // Actualizar la carpeta con la nueva carpeta padre
+    const updatedFolder = await prisma.folder.update({
+      where: { id: folderId },
+      data: { parentFolderId: newParentFolderId ? Number(newParentFolderId) : null },
+    });
+
+    res.json(updatedFolder);
+  } catch (error) {
+    console.error('Error al mover la carpeta:', error);
+    res.status(500).json({ error: 'Error interno al mover la carpeta.' });
+  }
+}) as RequestHandler);
+
+
+
 export default foldersRouter;
