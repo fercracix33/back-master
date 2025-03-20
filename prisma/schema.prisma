@@ -233,4 +233,54 @@ model CommunityResource {
   author       User          @relation(fields: [authorId], references: [id])
   communityId  Int
   community    Community     @relation(fields: [communityId], references: [id])
+  tags         CommunityResourceTag[] // 🔹 Se añadió esta línea para relacionar con etiquetas
+}
+
+
+
+// ✅ Modelo de Miembros de Comunidad
+model CommunityMembership {
+  id          Int           @id @default(autoincrement())
+  userId      Int
+  communityId Int
+  role        CommunityRole @default(MEMBER)
+  joinedAt    DateTime      @default(now())
+  user        User          @relation(fields: [userId], references: [id])
+  community   Community     @relation(fields: [communityId], references: [id])
+  @@unique([userId, communityId])
+}
+
+// ✅ Modelo de Hilos de Discusión en Comunidades
+model CommunityThread {
+  id          Int            @id @default(autoincrement())
+  title       String
+  content     String         @db.MediumText
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  authorId    Int
+  author      User           @relation(fields: [authorId], references: [id])
+  communityId Int
+  community   Community      @relation(fields: [communityId], references: [id])
+  comments    ThreadComment[]
+}
+
+// ✅ Modelo de Comentarios en Hilos de Comunidad
+model ThreadComment {
+  id        Int @id @default(autoincrement())
+  content   String @db.MediumText
+  createdAt DateTime @default(now())
+  threadId  Int
+  thread    CommunityThread @relation(fields: [threadId], references: [id])
+  authorId  Int
+  author    User @relation(fields: [authorId], references: [id])
+}
+
+// ✅ Modelo de Relación entre Recursos Comunitarios y Tags
+model CommunityResourceTag {
+  id                  Int               @id @default(autoincrement())
+  communityResource   CommunityResource @relation(fields: [communityResourceId], references: [id], onDelete: Cascade)
+  communityResourceId Int
+  tag                 Tag               @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  tagId               Int
+  @@unique([communityResourceId, tagId])
 }
