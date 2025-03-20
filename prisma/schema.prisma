@@ -101,15 +101,49 @@ model File {
   owner       User      @relation(fields: [ownerId], references: [id])
 }
 
-// ✅ Modelo de Solicitud de Amistad
-model FriendRequest {
-  id        Int          @id @default(autoincrement())
-  from      User         @relation("RequestsSent", fields: [fromId], references: [id])
-  fromId    Int
-  to        User         @relation("RequestsReceived", fields: [toId], references: [id])
-  toId      Int
-  status    FriendStatus @default(PENDING)
-  createdAt DateTime     @default(now())
+// ✅ Modelo de Tablero (Kanban)
+model Board {
+  id          Int      @id @default(autoincrement())
+  title       String
+  owner       User     @relation(fields: [ownerId], references: [id])
+  ownerId     Int
+  tasks       Task[]
+}
+
+// ✅ Modelo de Tarea
+model Task {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String?
+  done        Boolean   @default(false)
+  dueDate     DateTime?
+  tags        Json?
+  board       Board     @relation(fields: [boardId], references: [id])
+  boardId     Int
+}
+
+// ✅ Modelo de Chat
+model Chat {
+  id          Int       @id @default(autoincrement())
+  name        String?
+  isGroup     Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  users       User[]    @relation("UserChats")
+  messages    Message[]
+}
+
+// ✅ Modelo de Mensaje
+model Message {
+  id          Int       @id @default(autoincrement())
+  content     String
+  fileUrl     String?
+  createdAt   DateTime  @default(now())
+  sender      User      @relation(fields: [senderId], references: [id])
+  senderId    Int
+  chat        Chat      @relation(fields: [chatId], references: [id])
+  chatId      Int
+  note        Note?     @relation(fields: [noteId], references: [id])
+  noteId      Int?
 }
 
 // ✅ Modelo de Notificación
@@ -122,6 +156,17 @@ model Notification {
   scheduledFor  DateTime?
   user          User      @relation(fields: [userId], references: [id])
   userId        Int
+}
+
+// ✅ Modelo de Solicitud de Amistad
+model FriendRequest {
+  id        Int          @id @default(autoincrement())
+  from      User         @relation("RequestsSent", fields: [fromId], references: [id])
+  fromId    Int
+  to        User         @relation("RequestsReceived", fields: [toId], references: [id])
+  toId      Int
+  status    FriendStatus @default(PENDING)
+  createdAt DateTime     @default(now())
 }
 
 // ✅ Modelo de Evento
@@ -165,29 +210,6 @@ model Community {
   tags         CommunityTag[]
 }
 
-// ✅ Modelo de Miembros de Comunidad
-model CommunityMembership {
-  id          Int           @id @default(autoincrement())
-  userId      Int
-  communityId Int
-  role        CommunityRole @default(MEMBER)
-  joinedAt    DateTime      @default(now())
-  user        User          @relation(fields: [userId], references: [id])
-  community   Community     @relation(fields: [communityId], references: [id])
-  @@unique([userId, communityId])
-}
-
-// ✅ Modelo de Solicitudes para Unirse a Comunidad
-model CommunityJoinRequest {
-  id          Int       @id @default(autoincrement())
-  userId      Int
-  communityId Int
-  createdAt   DateTime  @default(now())
-  user        User      @relation(fields: [userId], references: [id])
-  community   Community @relation(fields: [communityId], references: [id])
-  @@unique([userId, communityId])
-}
-
 // ✅ Modelo de Recursos Comunitarios
 model CommunityResource {
   id           Int           @id @default(autoincrement())
@@ -214,16 +236,4 @@ model CommunityThread {
   author      User           @relation(fields: [authorId], references: [id])
   communityId Int
   community   Community      @relation(fields: [communityId], references: [id])
-  comments    ThreadComment[]
-}
-
-// ✅ Modelo de Comentarios en Hilos
-model ThreadComment {
-  id        Int @id @default(autoincrement())
-  content   String @db.MediumText
-  createdAt DateTime @default(now())
-  threadId  Int
-  thread    CommunityThread @relation(fields: [threadId], references: [id])
-  authorId  Int
-  author    User @relation(fields: [authorId], references: [id])
 }
