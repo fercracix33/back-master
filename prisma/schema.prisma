@@ -284,3 +284,13 @@ model CommunityResourceTag {
   tagId               Int
   @@unique([communityResourceId, tagId])
 }
+
+// ✅ Modelo de Relación entre Comunidades y Tags
+model CommunityTag {
+  id          Int       @id @default(autoincrement())
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  communityId Int
+  tag         Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  tagId       Int
+  @@unique([communityId, tagId])
+}
