@@ -138,7 +138,7 @@ model Message {
   content     String
   fileUrl     String?
   createdAt   DateTime  @default(now())
-  sender      User      @relation("UserMessages", fields: [senderId], references: [id])
+  sender      User      @relation(fields: [senderId], references: [id])
   senderId    Int
   chat        Chat      @relation(fields: [chatId], references: [id])
   chatId      Int
@@ -158,17 +158,6 @@ model Notification {
   userId        Int
 }
 
-// Modelo de Solicitud de Amistad
-model FriendRequest {
-  id          Int           @id @default(autoincrement())
-  from        User          @relation("RequestsSent", fields: [fromId], references: [id])
-  fromId      Int
-  to          User          @relation("RequestsReceived", fields: [toId], references: [id])
-  toId        Int
-  status      FriendStatus  @default(PENDING)
-  createdAt   DateTime      @default(now())
-}
-
 // Modelo de Evento
 model Event {
   id              Int      @id @default(autoincrement())
@@ -186,7 +175,13 @@ model Event {
   participants    User[]   @relation("EventParticipants")
 }
 
-// Nuevos Modelos para Comunidades
+// 🔹 Modelo de Etiquetas (Faltaba)
+model Tag {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+}
+
+// 🔹 Nuevos Modelos para Comunidades
 
 model Community {
   id           Int                  @id @default(autoincrement())
@@ -216,26 +211,12 @@ model CommunityMembership {
   @@unique([userId, communityId])
 }
 
-model CommunityJoinRequest {
-  id          Int       @id @default(autoincrement())
-  userId      Int
-  communityId Int
-  createdAt   DateTime  @default(now())
-  user        User      @relation(fields: [userId], references: [id])
-  community   Community @relation(fields: [communityId], references: [id])
-  @@unique([userId, communityId])
-}
-
 model CommunityResource {
   id           Int           @id @default(autoincrement())
   type         ResourceType
   resourceId   Int
   title        String
   description  String?
-  likes        Int           @default(0)
-  views        Int           @default(0)
-  downloads    Int           @default(0)
-  isPublic     Boolean       @default(true)
   createdAt    DateTime      @default(now())
   authorId     Int
   author       User          @relation(fields: [authorId], references: [id])
@@ -244,37 +225,12 @@ model CommunityResource {
   tags         CommunityResourceTag[]
 }
 
-model CommunityThread {
-  id          Int            @id @default(autoincrement())
-  title       String
-  content     String         @db.MediumText
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  authorId    Int
-  author      User           @relation(fields: [authorId], references: [id])
-  communityId Int
-  community   Community      @relation(fields: [communityId], references: [id])
-  comments    ThreadComment[]
-}
-
-model ThreadComment {
-  id        Int @id @default(autoincrement())
-  content   String @db.MediumText
-  createdAt DateTime @default(now())
-  threadId  Int
-  thread    CommunityThread @relation(fields: [threadId], references: [id])
-  authorId  Int
-  author    User @relation(fields: [authorId], references: [id])
-}
-
-
 model CommunityTag {
   id          Int       @id @default(autoincrement())
   community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
   communityId Int
   tag         Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
   tagId       Int
-
   @@unique([communityId, tagId])
 }
 
@@ -284,6 +240,5 @@ model CommunityResourceTag {
   communityResourceId Int
   tag                 Tag               @relation(fields: [tagId], references: [id], onDelete: Cascade)
   tagId               Int
-
   @@unique([communityResourceId, tagId])
 }
