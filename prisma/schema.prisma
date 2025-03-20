@@ -101,49 +101,15 @@ model File {
   owner       User      @relation(fields: [ownerId], references: [id])
 }
 
-// Modelo de Tablero (Kanban)
-model Board {
-  id          Int      @id @default(autoincrement())
-  title       String
-  owner       User     @relation(fields: [ownerId], references: [id])
-  ownerId     Int
-  tasks       Task[]
-}
-
-// Modelo de Tarea
-model Task {
-  id          Int       @id @default(autoincrement())
-  title       String
-  description String?
-  done        Boolean   @default(false)
-  dueDate     DateTime?
-  tags        Json?
-  board       Board     @relation(fields: [boardId], references: [id])
-  boardId     Int
-}
-
-// Modelo de Chat
-model Chat {
-  id          Int       @id @default(autoincrement())
-  name        String?
-  isGroup     Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  users       User[]    @relation("UserChats")
-  messages    Message[]
-}
-
-// Modelo de Mensaje
-model Message {
-  id          Int       @id @default(autoincrement())
-  content     String
-  fileUrl     String?
-  createdAt   DateTime  @default(now())
-  sender      User      @relation(fields: [senderId], references: [id])
-  senderId    Int
-  chat        Chat      @relation(fields: [chatId], references: [id])
-  chatId      Int
-  note        Note?     @relation(fields: [noteId], references: [id])
-  noteId      Int?
+// Modelo de Solicitud de Amistad (Faltaba)
+model FriendRequest {
+  id        Int          @id @default(autoincrement())
+  from      User         @relation("RequestsSent", fields: [fromId], references: [id])
+  fromId    Int
+  to        User         @relation("RequestsReceived", fields: [toId], references: [id])
+  toId      Int
+  status    FriendStatus @default(PENDING)
+  createdAt DateTime     @default(now())
 }
 
 // Modelo de Notificación
@@ -175,7 +141,7 @@ model Event {
   participants    User[]   @relation("EventParticipants")
 }
 
-// 🔹 Modelo de Etiquetas (Faltaba)
+// Modelo de Etiquetas (Faltaba)
 model Tag {
   id   Int    @id @default(autoincrement())
   name String @unique
@@ -200,6 +166,7 @@ model Community {
   tags         CommunityTag[]
 }
 
+// Modelo de Miembros de Comunidad
 model CommunityMembership {
   id          Int           @id @default(autoincrement())
   userId      Int
@@ -211,7 +178,33 @@ model CommunityMembership {
   @@unique([userId, communityId])
 }
 
-// **Modelo de Hilos de Discusión**
+// Modelo de Solicitudes de Ingreso a Comunidades
+model CommunityJoinRequest {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  communityId Int
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id])
+  community   Community @relation(fields: [communityId], references: [id])
+  @@unique([userId, communityId])
+}
+
+// Modelo de Recursos Comunitarios
+model CommunityResource {
+  id           Int           @id @default(autoincrement())
+  type         ResourceType
+  resourceId   Int
+  title        String
+  description  String?
+  createdAt    DateTime      @default(now())
+  authorId     Int
+  author       User          @relation(fields: [authorId], references: [id])
+  communityId  Int
+  community    Community     @relation(fields: [communityId], references: [id])
+  tags         CommunityResourceTag[]
+}
+
+// Modelo de Hilos de Discusión
 model CommunityThread {
   id          Int            @id @default(autoincrement())
   title       String
@@ -225,7 +218,7 @@ model CommunityThread {
   comments    ThreadComment[]
 }
 
-// **Modelo de Comentarios en Hilos**
+// Modelo de Comentarios en Hilos
 model ThreadComment {
   id        Int @id @default(autoincrement())
   content   String @db.MediumText
