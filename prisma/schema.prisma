@@ -266,3 +266,24 @@ model ThreadComment {
   authorId  Int
   author    User @relation(fields: [authorId], references: [id])
 }
+
+
+model CommunityTag {
+  id          Int       @id @default(autoincrement())
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  communityId Int
+  tag         Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  tagId       Int
+
+  @@unique([communityId, tagId])
+}
+
+model CommunityResourceTag {
+  id                  Int               @id @default(autoincrement())
+  communityResource   CommunityResource @relation(fields: [communityResourceId], references: [id], onDelete: Cascade)
+  communityResourceId Int
+  tag                 Tag               @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  tagId               Int
+
+  @@unique([communityResourceId, tagId])
+}
