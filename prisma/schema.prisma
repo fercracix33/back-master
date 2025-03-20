@@ -211,34 +211,27 @@ model CommunityMembership {
   @@unique([userId, communityId])
 }
 
-model CommunityResource {
-  id           Int           @id @default(autoincrement())
-  type         ResourceType
-  resourceId   Int
-  title        String
-  description  String?
-  createdAt    DateTime      @default(now())
-  authorId     Int
-  author       User          @relation(fields: [authorId], references: [id])
-  communityId  Int
-  community    Community     @relation(fields: [communityId], references: [id])
-  tags         CommunityResourceTag[]
-}
-
-model CommunityTag {
-  id          Int       @id @default(autoincrement())
-  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+// **Modelo de Hilos de Discusión**
+model CommunityThread {
+  id          Int            @id @default(autoincrement())
+  title       String
+  content     String         @db.MediumText
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  authorId    Int
+  author      User           @relation(fields: [authorId], references: [id])
   communityId Int
-  tag         Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
-  tagId       Int
-  @@unique([communityId, tagId])
+  community   Community      @relation(fields: [communityId], references: [id])
+  comments    ThreadComment[]
 }
 
-model CommunityResourceTag {
-  id                  Int               @id @default(autoincrement())
-  communityResource   CommunityResource @relation(fields: [communityResourceId], references: [id], onDelete: Cascade)
-  communityResourceId Int
-  tag                 Tag               @relation(fields: [tagId], references: [id], onDelete: Cascade)
-  tagId               Int
-  @@unique([communityResourceId, tagId])
+// **Modelo de Comentarios en Hilos**
+model ThreadComment {
+  id        Int @id @default(autoincrement())
+  content   String @db.MediumText
+  createdAt DateTime @default(now())
+  threadId  Int
+  thread    CommunityThread @relation(fields: [threadId], references: [id])
+  authorId  Int
+  author    User @relation(fields: [authorId], references: [id])
 }
