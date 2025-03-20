@@ -160,13 +160,13 @@ model Notification {
 
 // ✅ Modelo de Solicitud de Amistad
 model FriendRequest {
-  id        Int          @id @default(autoincrement())
-  from      User         @relation("RequestsSent", fields: [fromId], references: [id])
+  id        Int           @id @default(autoincrement())
+  from      User          @relation("RequestsSent", fields: [fromId], references: [id])
   fromId    Int
-  to        User         @relation("RequestsReceived", fields: [toId], references: [id])
+  to        User          @relation("RequestsReceived", fields: [toId], references: [id])
   toId      Int
-  status    FriendStatus @default(PENDING)
-  createdAt DateTime     @default(now())
+  status    FriendStatus  @default(PENDING)
+  createdAt DateTime      @default(now())
 }
 
 // ✅ Modelo de Evento
@@ -210,6 +210,17 @@ model Community {
   tags         CommunityTag[]
 }
 
+// ✅ Modelo de Solicitudes para Unirse a Comunidades
+model CommunityJoinRequest {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  communityId Int
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id])
+  community   Community @relation(fields: [communityId], references: [id])
+  @@unique([userId, communityId])
+}
+
 // ✅ Modelo de Recursos Comunitarios
 model CommunityResource {
   id           Int           @id @default(autoincrement())
@@ -222,18 +233,4 @@ model CommunityResource {
   author       User          @relation(fields: [authorId], references: [id])
   communityId  Int
   community    Community     @relation(fields: [communityId], references: [id])
-  tags         CommunityResourceTag[]
-}
-
-// ✅ Modelo de Hilos de Discusión
-model CommunityThread {
-  id          Int            @id @default(autoincrement())
-  title       String
-  content     String         @db.MediumText
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  authorId    Int
-  author      User           @relation(fields: [authorId], references: [id])
-  communityId Int
-  community   Community      @relation(fields: [communityId], references: [id])
 }
