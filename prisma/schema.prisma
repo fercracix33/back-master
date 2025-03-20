@@ -36,79 +36,80 @@ enum CommunityRole {
 
 // ✅ Modelo de Usuario
 model User {
-  id                      Int                 @id @default(autoincrement())
-  name                    String
-  email                   String              @unique
-  password                String
-  notes                   Note[]
-  folders                 Folder[]
-  boards                  Board[]
-  chats                   Chat[]              @relation("UserChats")
-  messages                Message[]           @relation("UserMessages")
-  notifications           Notification[]
-  friendRequestsSent      FriendRequest[]     @relation("RequestsSent")
-  friendRequestsReceived  FriendRequest[]     @relation("RequestsReceived")
-  ownedEvents             Event[]             @relation("EventOwner")
-  events                  Event[]             @relation("EventParticipants")
-  files                   File[]
-  communityMemberships    CommunityMembership[]
-  joinRequests            CommunityJoinRequest[]
-  communityResources      CommunityResource[]
-  threads                 CommunityThread[]
-  threadComments          ThreadComment[]
-  ownedCommunities Community[] @relation("OwnedCommunities")
+  id       Int       @id @default(autoincrement())
+  name     String
+  email    String    @unique
+  password String
+  notes    Note[]
+  folders  Folder[]
+  boards   Board[]
+  chats    Chat[]    @relation("UserChats")
+  messages Message[] @relation("UserMessages")
+
+  notifications          Notification[]
+  friendRequestsSent     FriendRequest[]        @relation("RequestsSent")
+  friendRequestsReceived FriendRequest[]        @relation("RequestsReceived")
+  ownedEvents            Event[]                @relation("EventOwner")
+  events                 Event[]                @relation("EventParticipants")
+  files                  File[]
+  communityMemberships   CommunityMembership[]
+  joinRequests           CommunityJoinRequest[]
+  communityResources     CommunityResource[]
+  threads                CommunityThread[]
+  threadComments         ThreadComment[]
+  ownedCommunities       Community[]            @relation("OwnedCommunities")
 }
 
 // ✅ Modelo de Nota
 model Note {
-  id          Int       @id @default(autoincrement())
-  title       String
-  content     String    @db.MediumText
-  isPublic    Boolean   @default(false)
-  likes       Int       @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  author      User      @relation(fields: [authorId], references: [id])
-  authorId    Int
-  folder      Folder?   @relation(fields: [folderId], references: [id])
-  folderId    Int?
-  messages    Message[]
+  id        Int       @id @default(autoincrement())
+  title     String
+  content   String    @db.MediumText
+  isPublic  Boolean   @default(false)
+  likes     Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  author    User      @relation(fields: [authorId], references: [id])
+  authorId  Int
+  folder    Folder?   @relation(fields: [folderId], references: [id])
+  folderId  Int?
+  messages  Message[]
 }
 
 // ✅ Modelo de Carpeta
 model Folder {
-  id          Int      @id @default(autoincrement())
-  name        String
-  parent      Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id])
-  parentId    Int?
-  children    Folder[] @relation("FolderHierarchy")
-  owner       User     @relation(fields: [ownerId], references: [id])
-  ownerId     Int
-  notes       Note[]
-  files       File[]
+  id       Int      @id @default(autoincrement())
+  name     String
+  parent   Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id])
+  parentId Int?
+  children Folder[] @relation("FolderHierarchy")
+  owner    User     @relation(fields: [ownerId], references: [id])
+  ownerId  Int
+  notes    Note[]
+  files    File[]
 }
 
 // ✅ Modelo de Archivo
 model File {
-  id          Int       @id @default(autoincrement())
-  name        String
-  path        String
-  size        Int
-  mimeType    String
-  createdAt   DateTime  @default(now())
-  folderId    Int?
-  folder      Folder?   @relation(fields: [folderId], references: [id], onDelete: Cascade)
-  ownerId     Int
-  owner       User      @relation(fields: [ownerId], references: [id])
+  id        Int      @id @default(autoincrement())
+  name      String
+  path      String
+  size      Int
+  mimeType  String
+  createdAt DateTime @default(now())
+  folderId  Int?
+  folder    Folder?  @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  ownerId   Int
+  owner     User     @relation(fields: [ownerId], references: [id])
 }
 
 // ✅ Modelo de Tablero (Kanban)
 model Board {
-  id          Int      @id @default(autoincrement())
-  title       String
-  owner       User     @relation(fields: [ownerId], references: [id])
-  ownerId     Int
-  tasks       Task[]
+  id      Int    @id @default(autoincrement())
+  title   String
+  owner   User   @relation(fields: [ownerId], references: [id])
+  ownerId Int
+  tasks   Task[]
 }
 
 // ✅ Modelo de Tarea
@@ -125,12 +126,12 @@ model Task {
 
 // ✅ Modelo de Chat
 model Chat {
-  id          Int       @id @default(autoincrement())
-  name        String?
-  isGroup     Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  users       User[]    @relation("UserChats")
-  messages    Message[]
+  id        Int       @id @default(autoincrement())
+  name      String?
+  isGroup   Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  users     User[]    @relation("UserChats")
+  messages  Message[]
 }
 
 // ✅ Relación bidireccional en Message
@@ -141,36 +142,36 @@ model Message {
   createdAt DateTime @default(now())
 
   // Relaciones
-  sender    User     @relation(fields: [senderId], references: [id], backRef: "messages") // Asegura la relación bidireccional
-  senderId  Int
-  chat      Chat     @relation(fields: [chatId], references: [id])
-  chatId    Int
-  note      Note?    @relation(fields: [noteId], references: [id])
-  noteId    Int?
-}
+  sender   User @relation("UserMessages", fields: [senderId], references: [id])
+  senderId Int
 
+  chat   Chat  @relation(fields: [chatId], references: [id])
+  chatId Int
+  note   Note? @relation(fields: [noteId], references: [id])
+  noteId Int?
+}
 
 // ✅ Modelo de Notificación
 model Notification {
-  id            Int       @id @default(autoincrement())
-  message       String
-  type          String?
-  isRead        Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  scheduledFor  DateTime?
-  user          User      @relation(fields: [userId], references: [id])
-  userId        Int
+  id           Int       @id @default(autoincrement())
+  message      String
+  type         String?
+  isRead       Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  scheduledFor DateTime?
+  user         User      @relation(fields: [userId], references: [id])
+  userId       Int
 }
 
 // ✅ Modelo de Solicitud de Amistad
 model FriendRequest {
-  id        Int           @id @default(autoincrement())
-  from      User          @relation("RequestsSent", fields: [fromId], references: [id])
+  id        Int          @id @default(autoincrement())
+  from      User         @relation("RequestsSent", fields: [fromId], references: [id])
   fromId    Int
-  to        User          @relation("RequestsReceived", fields: [toId], references: [id])
+  to        User         @relation("RequestsReceived", fields: [toId], references: [id])
   toId      Int
-  status    FriendStatus  @default(PENDING)
-  createdAt DateTime      @default(now())
+  status    FriendStatus @default(PENDING)
+  createdAt DateTime     @default(now())
 }
 
 // ✅ Modelo de Evento
@@ -201,19 +202,18 @@ model Tag {
   resourceTags  CommunityResourceTag[]
 }
 
-
 // ✅ Modelos de Comunidad
 // ✅ Relación bidireccional en Community
 model Community {
-  id         Int      @id @default(autoincrement())
-  name       String   @unique
+  id          Int                 @id @default(autoincrement())
+  name        String              @unique
   description String?
-  image      String?
-  visibility CommunityVisibility @default(PUBLIC)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  creatorId  Int
-  creator    User      @relation("OwnedCommunities", fields: [creatorId], references: [id])
+  image       String?
+  visibility  CommunityVisibility @default(PUBLIC)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  creatorId   Int
+  creator     User                @relation("OwnedCommunities", fields: [creatorId], references: [id])
 
   members      CommunityMembership[]
   joinRequests CommunityJoinRequest[]
@@ -221,7 +221,6 @@ model Community {
   threads      CommunityThread[]
   tags         CommunityTag[]
 }
-
 
 // ✅ Modelo de Solicitudes para Unirse a Comunidades
 model CommunityJoinRequest {
@@ -231,25 +230,24 @@ model CommunityJoinRequest {
   createdAt   DateTime  @default(now())
   user        User      @relation(fields: [userId], references: [id])
   community   Community @relation(fields: [communityId], references: [id])
+
   @@unique([userId, communityId])
 }
 
 // ✅ Modelo de Recursos Comunitarios
 model CommunityResource {
-  id           Int           @id @default(autoincrement())
-  type         ResourceType
-  resourceId   Int
-  title        String
-  description  String?
-  createdAt    DateTime      @default(now())
-  authorId     Int
-  author       User          @relation(fields: [authorId], references: [id])
-  communityId  Int
-  community    Community     @relation(fields: [communityId], references: [id])
-  tags         CommunityResourceTag[] // 🔹 Se añadió esta línea para relacionar con etiquetas
+  id          Int                    @id @default(autoincrement())
+  type        ResourceType
+  resourceId  Int
+  title       String
+  description String?
+  createdAt   DateTime               @default(now())
+  authorId    Int
+  author      User                   @relation(fields: [authorId], references: [id])
+  communityId Int
+  community   Community              @relation(fields: [communityId], references: [id])
+  tags        CommunityResourceTag[] // 🔹 Se añadió esta línea para relacionar con etiquetas
 }
-
-
 
 // ✅ Modelo de Miembros de Comunidad
 model CommunityMembership {
@@ -260,32 +258,33 @@ model CommunityMembership {
   joinedAt    DateTime      @default(now())
   user        User          @relation(fields: [userId], references: [id])
   community   Community     @relation(fields: [communityId], references: [id])
+
   @@unique([userId, communityId])
 }
 
 // ✅ Modelo de Hilos de Discusión en Comunidades
 model CommunityThread {
-  id          Int            @id @default(autoincrement())
+  id          Int             @id @default(autoincrement())
   title       String
-  content     String         @db.MediumText
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  content     String          @db.MediumText
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
   authorId    Int
-  author      User           @relation(fields: [authorId], references: [id])
+  author      User            @relation(fields: [authorId], references: [id])
   communityId Int
-  community   Community      @relation(fields: [communityId], references: [id])
+  community   Community       @relation(fields: [communityId], references: [id])
   comments    ThreadComment[]
 }
 
 // ✅ Modelo de Comentarios en Hilos de Comunidad
 model ThreadComment {
-  id        Int @id @default(autoincrement())
-  content   String @db.MediumText
-  createdAt DateTime @default(now())
+  id        Int             @id @default(autoincrement())
+  content   String          @db.MediumText
+  createdAt DateTime        @default(now())
   threadId  Int
   thread    CommunityThread @relation(fields: [threadId], references: [id])
   authorId  Int
-  author    User @relation(fields: [authorId], references: [id])
+  author    User            @relation(fields: [authorId], references: [id])
 }
 
 // ✅ Modelo de Relación entre Recursos Comunitarios y Tags
@@ -299,7 +298,6 @@ model CommunityResourceTag {
 
   @@unique([communityResourceId, tagId])
 }
-
 
 // ✅ Modelo de Relación entre Comunidades y Tags
 // ✅ Relación bidireccional en CommunityTag
