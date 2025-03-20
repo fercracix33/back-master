@@ -18,6 +18,10 @@ import friendsRouter from './routes/friends';
 import eventsRouter from './routes/events';
 import foldersRouter from './routes/folders';
 import filesRouter from './routes/files';
+import communitiesRouter from './routes/communities';
+import communityResourcesRouter from './routes/communityResources';
+import communityThreadsRouter from './routes/communityThreads';
+import tagsRouter from './routes/tags';
 
 dotenv.config(); // Cargar variables de entorno
 
@@ -84,7 +88,10 @@ app.use('/api/events', authenticateToken, eventsRouter);
 app.use('/api/folders', authenticateToken, foldersRouter);
 app.use('/api/upload', authenticateToken, filesRouter);
 app.use('/api/files', authenticateToken, filesRouter);
-
+app.use('/api/communities', authenticateToken, communitiesRouter);
+app.use('/api/community-resources', authenticateToken, communityResourcesRouter);
+app.use('/api/community-threads', authenticateToken, communityThreadsRouter);
+app.use('/api/tags', authenticateToken, tagsRouter);
 
 // 📌 Rutas no encontradas
 app.use((req, res, next) => {

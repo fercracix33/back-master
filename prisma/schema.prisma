@@ -14,161 +14,255 @@ enum FriendStatus {
   REJECTED
 }
 
+// Enum para tipos de recursos comunitarios
+enum ResourceType {
+  NOTE
+  FILE
+  FOLDER
+}
+
+// Enum de visibilidad de comunidad
+enum CommunityVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+// Enum para roles en la comunidad
+enum CommunityRole {
+  ADMIN
+  MODERATOR
+  MEMBER
+}
+
 // Modelo de Usuario
 model User {
-  id            Int       @id @default(autoincrement())
-  name          String
-  email         String    @unique
-  password      String
-  // Relaciones
-  notes         Note[]            // Notas propias del usuario
-  folders       Folder[]          // Carpetas del usuario
-  boards        Board[]           // Tableros (para tareas) del usuario
-  chats         Chat[]            @relation("UserChats")
-  messages      Message[]         @relation("UserMessages")
-  notifications Notification[]    // Notificaciones del usuario
-  friendRequestsSent   FriendRequest[] @relation("RequestsSent")
-  friendRequestsReceived FriendRequest[] @relation("RequestsReceived")
-  ownedEvents   Event[]          @relation("EventOwner")
-  events        Event[]          @relation("EventParticipants")
-  files         File[]           // ✅ Archivos subidos por el usuario
+  id                      Int                 @id @default(autoincrement())
+  name                    String
+  email                   String              @unique
+  password                String
+  notes                   Note[]
+  folders                 Folder[]
+  boards                  Board[]
+  chats                   Chat[]              @relation("UserChats")
+  messages                Message[]           @relation("UserMessages")
+  notifications           Notification[]
+  friendRequestsSent      FriendRequest[]     @relation("RequestsSent")
+  friendRequestsReceived  FriendRequest[]     @relation("RequestsReceived")
+  ownedEvents             Event[]             @relation("EventOwner")
+  events                  Event[]             @relation("EventParticipants")
+  files                   File[]
+  communityMemberships    CommunityMembership[]
+  joinRequests            CommunityJoinRequest[]
+  communityResources      CommunityResource[]
+  threads                 CommunityThread[]
+  threadComments          ThreadComment[]
 }
 
 // Modelo de Nota
 model Note {
-  id        Int      @id @default(autoincrement())
-  title     String
-  content   String   @db.MediumText
-  isPublic  Boolean  @default(false)
-  likes     Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  // Relaciones
-  author    User     @relation(fields: [authorId], references: [id])
-  authorId  Int
-  folder    Folder?  @relation(fields: [folderId], references: [id])
-  folderId  Int?
-  messages  Message[]  // Mensajes que hacen referencia a esta nota
+  id          Int       @id @default(autoincrement())
+  title       String
+  content     String    @db.MediumText
+  isPublic    Boolean   @default(false)
+  likes       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  author      User      @relation(fields: [authorId], references: [id])
+  authorId    Int
+  folder      Folder?   @relation(fields: [folderId], references: [id])
+  folderId    Int?
+  messages    Message[]
 }
 
-// Modelo de Carpeta (para organizar notas del usuario)
-// Modelo de Carpeta (para organizar archivos y notas)
+// Modelo de Carpeta
 model Folder {
-  id       Int      @id @default(autoincrement())
-  name     String
-  parent   Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id])
-  parentId Int?
-  children Folder[] @relation("FolderHierarchy")
-  // Relaciones
-  owner    User     @relation(fields: [ownerId], references: [id])
-  ownerId  Int
-  notes    Note[]   // Notas dentro de esta carpeta
-  files    File[]   // Archivos dentro de esta carpeta
+  id          Int      @id @default(autoincrement())
+  name        String
+  parent      Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id])
+  parentId    Int?
+  children    Folder[] @relation("FolderHierarchy")
+  owner       User     @relation(fields: [ownerId], references: [id])
+  ownerId     Int
+  notes       Note[]
+  files       File[]
 }
 
 // Modelo de Archivo
 model File {
-  id         Int      @id @default(autoincrement())
-  name       String
-  path       String   // Ruta de almacenamiento
-  size       Int      // Tamaño en bytes
-  mimeType   String   // Tipo MIME (ej. "image/png", "application/pdf")
-  createdAt  DateTime @default(now())
-  folderId   Int?     // Puede estar en una carpeta o en la raíz
-  folder     Folder?  @relation(fields: [folderId], references: [id], onDelete: Cascade)
-  ownerId    Int
-  owner      User     @relation(fields: [ownerId], references: [id]) // ✅ Relación con el usuario
+  id          Int       @id @default(autoincrement())
+  name        String
+  path        String
+  size        Int
+  mimeType    String
+  createdAt   DateTime  @default(now())
+  folderId    Int?
+  folder      Folder?   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  ownerId     Int
+  owner       User      @relation(fields: [ownerId], references: [id])
 }
 
-
-// Modelo de Tablero (Kanban de tareas)
+// Modelo de Tablero (Kanban)
 model Board {
-  id       Int     @id @default(autoincrement())
-  title    String
-  // Relaciones
-  owner    User    @relation(fields: [ownerId], references: [id])
-  ownerId  Int
-  tasks    Task[]  // Tareas en este tablero
+  id          Int      @id @default(autoincrement())
+  title       String
+  owner       User     @relation(fields: [ownerId], references: [id])
+  ownerId     Int
+  tasks       Task[]
 }
 
 // Modelo de Tarea
 model Task {
-  id          Int      @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   title       String
   description String?
-  done        Boolean  @default(false)
+  done        Boolean   @default(false)
   dueDate     DateTime?
   tags        Json?
-  // Relaciones
-  board       Board    @relation(fields: [boardId], references: [id])
+  board       Board     @relation(fields: [boardId], references: [id])
   boardId     Int
 }
 
-// Modelo de Chat (conversación privada o grupal)
+// Modelo de Chat
 model Chat {
-  id         Int       @id @default(autoincrement())
-  name       String?   // nombre del chat (null si es chat privado)
-  isGroup    Boolean   @default(false)
-  createdAt  DateTime  @default(now())
-  // Relaciones
-  users      User[]    @relation("UserChats")   // Participantes en el chat
-  messages   Message[] // Mensajes en el chat
+  id          Int       @id @default(autoincrement())
+  name        String?
+  isGroup     Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  users       User[]    @relation("UserChats")
+  messages    Message[]
 }
 
-// Modelo de Mensaje (mensaje de chat)
+// Modelo de Mensaje
 model Message {
-  id        Int      @id @default(autoincrement())
-  content   String
-  fileUrl   String?
-  createdAt DateTime @default(now())
-  // Relaciones
-  sender    User    @relation("UserMessages", fields: [senderId], references: [id])
-  senderId  Int
-  chat      Chat    @relation(fields: [chatId], references: [id])
-  chatId    Int
-  note      Note?   @relation(fields: [noteId], references: [id])
-  noteId    Int?
+  id          Int       @id @default(autoincrement())
+  content     String
+  fileUrl     String?
+  createdAt   DateTime  @default(now())
+  sender      User      @relation("UserMessages", fields: [senderId], references: [id])
+  senderId    Int
+  chat        Chat      @relation(fields: [chatId], references: [id])
+  chatId      Int
+  note        Note?     @relation(fields: [noteId], references: [id])
+  noteId      Int?
 }
 
 // Modelo de Notificación
 model Notification {
-  id          Int      @id @default(autoincrement())
-  message     String
-  type        String?   // tipo de notificación (ej: "chat", "task", "social", "friend", "event")
-  isRead      Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  scheduledFor DateTime?
-  // Relaciones
-  user       User     @relation(fields: [userId], references: [id])
-  userId     Int
-  // (Opcional: referenceId para vincular a entidad relacionada)
+  id            Int       @id @default(autoincrement())
+  message       String
+  type          String?
+  isRead        Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  scheduledFor  DateTime?
+  user          User      @relation(fields: [userId], references: [id])
+  userId        Int
 }
 
 // Modelo de Solicitud de Amistad
 model FriendRequest {
-  id        Int          @id @default(autoincrement())
-  from      User         @relation("RequestsSent", fields: [fromId], references: [id])
-  fromId    Int
-  to        User         @relation("RequestsReceived", fields: [toId], references: [id])
-  toId      Int
-  status    FriendStatus @default(PENDING)
-  createdAt DateTime     @default(now())
+  id          Int           @id @default(autoincrement())
+  from        User          @relation("RequestsSent", fields: [fromId], references: [id])
+  fromId      Int
+  to          User          @relation("RequestsReceived", fields: [toId], references: [id])
+  toId        Int
+  status      FriendStatus  @default(PENDING)
+  createdAt   DateTime      @default(now())
 }
 
-// Modelo de Evento del Calendario
+// Modelo de Evento
 model Event {
+  id              Int      @id @default(autoincrement())
+  title           String
+  description     String?
+  date            DateTime @db.Date
+  startTime       String?
+  endTime         String?
+  category        String?
+  color           String?
+  reminderMinutes Int?     @default(1440)
+  createdAt       DateTime @default(now())
+  owner           User     @relation("EventOwner", fields: [ownerId], references: [id])
+  ownerId         Int
+  participants    User[]   @relation("EventParticipants")
+}
+
+// Nuevos Modelos para Comunidades
+
+model Community {
+  id           Int                  @id @default(autoincrement())
+  name         String               @unique
+  description  String?
+  image        String?
+  visibility   CommunityVisibility  @default(PUBLIC)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  creatorId    Int
+  creator      User                 @relation(fields: [creatorId], references: [id])
+  members      CommunityMembership[]
+  joinRequests CommunityJoinRequest[]
+  resources    CommunityResource[]
+  threads      CommunityThread[]
+  tags         CommunityTag[]
+}
+
+model CommunityMembership {
+  id          Int           @id @default(autoincrement())
+  userId      Int
+  communityId Int
+  role        CommunityRole @default(MEMBER)
+  joinedAt    DateTime      @default(now())
+  user        User          @relation(fields: [userId], references: [id])
+  community   Community     @relation(fields: [communityId], references: [id])
+  @@unique([userId, communityId])
+}
+
+model CommunityJoinRequest {
   id          Int       @id @default(autoincrement())
-  title       String
-  description String?
-  date        DateTime  @db.Date      // solo fecha (YYYY-MM-DD)
-  startTime   String?
-  endTime     String?
-  category    String?
-  color       String?
-  reminderMinutes Int?  @default(1440) // minutos de antelación para aviso (1440 = 1 día)
+  userId      Int
+  communityId Int
   createdAt   DateTime  @default(now())
-  // Relaciones
-  owner       User      @relation("EventOwner", fields: [ownerId], references: [id])
-  ownerId     Int
-  participants User[]   @relation("EventParticipants")
+  user        User      @relation(fields: [userId], references: [id])
+  community   Community @relation(fields: [communityId], references: [id])
+  @@unique([userId, communityId])
+}
+
+model CommunityResource {
+  id           Int           @id @default(autoincrement())
+  type         ResourceType
+  resourceId   Int
+  title        String
+  description  String?
+  likes        Int           @default(0)
+  views        Int           @default(0)
+  downloads    Int           @default(0)
+  isPublic     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  authorId     Int
+  author       User          @relation(fields: [authorId], references: [id])
+  communityId  Int
+  community    Community     @relation(fields: [communityId], references: [id])
+  tags         CommunityResourceTag[]
+}
+
+model CommunityThread {
+  id          Int            @id @default(autoincrement())
+  title       String
+  content     String         @db.MediumText
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  authorId    Int
+  author      User           @relation(fields: [authorId], references: [id])
+  communityId Int
+  community   Community      @relation(fields: [communityId], references: [id])
+  comments    ThreadComment[]
+}
+
+model ThreadComment {
+  id        Int @id @default(autoincrement())
+  content   String @db.MediumText
+  createdAt DateTime @default(now())
+  threadId  Int
+  thread    CommunityThread @relation(fields: [threadId], references: [id])
+  authorId  Int
+  author    User @relation(fields: [authorId], references: [id])
 }
