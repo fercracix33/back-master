@@ -56,6 +56,7 @@ model User {
   communityResources      CommunityResource[]
   threads                 CommunityThread[]
   threadComments          ThreadComment[]
+  ownedCommunities Community[] @relation("OwnedCommunities")
 }
 
 // ✅ Modelo de Nota
@@ -132,19 +133,22 @@ model Chat {
   messages    Message[]
 }
 
-// ✅ Modelo de Mensaje
+// ✅ Relación bidireccional en Message
 model Message {
-  id          Int       @id @default(autoincrement())
-  content     String
-  fileUrl     String?
-  createdAt   DateTime  @default(now())
-  sender      User      @relation(fields: [senderId], references: [id])
-  senderId    Int
-  chat        Chat      @relation(fields: [chatId], references: [id])
-  chatId      Int
-  note        Note?     @relation(fields: [noteId], references: [id])
-  noteId      Int?
+  id        Int      @id @default(autoincrement())
+  content   String
+  fileUrl   String?
+  createdAt DateTime @default(now())
+
+  // Relaciones
+  sender    User     @relation(fields: [senderId], references: [id], backRef: "messages") // Asegura la relación bidireccional
+  senderId  Int
+  chat      Chat     @relation(fields: [chatId], references: [id])
+  chatId    Int
+  note      Note?    @relation(fields: [noteId], references: [id])
+  noteId    Int?
 }
+
 
 // ✅ Modelo de Notificación
 model Notification {
@@ -187,28 +191,37 @@ model Event {
 }
 
 // ✅ Modelo de Etiquetas
+// ✅ Relación bidireccional en Tag
 model Tag {
   id   Int    @id @default(autoincrement())
   name String @unique
+
+  // Relaciones bidireccionales
+  communityTags CommunityTag[]
+  resourceTags  CommunityResourceTag[]
 }
 
+
 // ✅ Modelos de Comunidad
+// ✅ Relación bidireccional en Community
 model Community {
-  id           Int                  @id @default(autoincrement())
-  name         String               @unique
-  description  String?
-  image        String?
-  visibility   CommunityVisibility  @default(PUBLIC)
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
-  creatorId    Int
-  creator      User                 @relation(fields: [creatorId], references: [id])
+  id         Int      @id @default(autoincrement())
+  name       String   @unique
+  description String?
+  image      String?
+  visibility CommunityVisibility @default(PUBLIC)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  creatorId  Int
+  creator    User      @relation("OwnedCommunities", fields: [creatorId], references: [id])
+
   members      CommunityMembership[]
   joinRequests CommunityJoinRequest[]
   resources    CommunityResource[]
   threads      CommunityThread[]
   tags         CommunityTag[]
 }
+
 
 // ✅ Modelo de Solicitudes para Unirse a Comunidades
 model CommunityJoinRequest {
@@ -276,21 +289,26 @@ model ThreadComment {
 }
 
 // ✅ Modelo de Relación entre Recursos Comunitarios y Tags
+// ✅ Relación bidireccional en CommunityResourceTag
 model CommunityResourceTag {
   id                  Int               @id @default(autoincrement())
   communityResource   CommunityResource @relation(fields: [communityResourceId], references: [id], onDelete: Cascade)
   communityResourceId Int
   tag                 Tag               @relation(fields: [tagId], references: [id], onDelete: Cascade)
   tagId               Int
+
   @@unique([communityResourceId, tagId])
 }
 
+
 // ✅ Modelo de Relación entre Comunidades y Tags
+// ✅ Relación bidireccional en CommunityTag
 model CommunityTag {
   id          Int       @id @default(autoincrement())
   community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
   communityId Int
   tag         Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
   tagId       Int
+
   @@unique([communityId, tagId])
 }
