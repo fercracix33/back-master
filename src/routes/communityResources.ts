@@ -6,10 +6,10 @@ const communityResourcesRouter = Router();
 
 // 📌 Añadir recurso a una comunidad (archivo, nota o carpeta)
 communityResourcesRouter.post('/', async (req: AuthRequest, res: Response) => {
-  const { communityId, resourceId, resourceType, tags } = req.body;
+  const { communityId, resourceId, resourceType: type, tags } = req.body;
   const userId = req.user?.userId;
 
-  if (!communityId || !resourceId || !resourceType) {
+  if (!communityId || !resourceId || !type) {
     res.status(400).json({ error: 'Faltan parámetros obligatorios.' });
     return;
   }
@@ -23,20 +23,18 @@ communityResourcesRouter.post('/', async (req: AuthRequest, res: Response) => {
       res.status(403).json({ error: 'No perteneces a esta comunidad.' });
       return;
     }
-
     const resource = await prisma.communityResource.create({
       data: {
         communityId,
         resourceId,
-        resourceType,
-        addedByUserId: userId,
+        type, // "NOTE", "FILE", "FOLDER"
+        authorId: userId, // correcto según schema
         tags: tags
           ? { create: tags.map((tagId: number) => ({ tag: { connect: { id: tagId } } })) }
           : undefined,
       },
       include: { tags: { include: { tag: true } } },
     });
-
     res.status(201).json(resource);
   } catch (error) {
     console.error(error);
