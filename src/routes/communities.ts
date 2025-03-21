@@ -170,4 +170,138 @@ communitiesRouter.delete('/:id', (async (req: Request, res: Response) => {
   }
 }) as RequestHandler);
 
+
+// 📌 Enviar solicitud de unión a una comunidad
+communitiesRouter.post('/:id/join-request', (async (req: AuthRequest, res: Response) => {
+  const userId = req.user?.userId;
+  const communityId = Number(req.params.id);
+
+  try {
+    const existingMembership = await prisma.communityMembership.findUnique({
+      where: { userId_communityId: { userId, communityId } },
+    });
+
+    if (existingMembership) {
+      return res.status(400).json({ error: 'Ya eres miembro de esta comunidad.' });
+    }
+
+    const existingRequest = await prisma.communityJoinRequest.findUnique({
+      where: { userId_communityId: { userId, communityId } },
+    });
+
+    if (existingRequest) {
+      return res.status(400).json({ error: 'Ya has solicitado unirte a esta comunidad.' });
+    }
+
+    const request = await prisma.communityJoinRequest.create({
+      data: { userId, communityId },
+    });
+
+    res.status(201).json(request);
+  } catch (error) {
+    console.error('Error al solicitar unirse a la comunidad:', error);
+    res.status(500).json({ error: 'Error interno' });
+  }
+}) as RequestHandler);
+
+// 📌 Ver solicitudes pendientes (solo admins)
+communitiesRouter.get('/:id/join-requests', (async (req: AuthRequest, res: Response) => {
+  const userId = req.user?.userId;
+  const communityId = Number(req.params.id);
+
+  try {
+    const membership = await prisma.communityMembership.findUnique({
+      where: { userId_communityId: { userId, communityId } },
+    });
+
+    if (!membership || membership.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
+
+    const requests = await prisma.communityJoinRequest.findMany({
+      where: { communityId },
+      include: { user: { select: { id: true, name: true, email: true } } },
+    });
+
+    res.json(requests);
+  } catch (error) {
+    console.error('Error al obtener solicitudes de unión:', error);
+    res.status(500).json({ error: 'Error interno' });
+  }
+}) as RequestHandler);
+
+// 📌 Aceptar solicitud de unión
+communitiesRouter.post('/:id/join-requests/:requestId/accept', (async (req: AuthRequest, res: Response) => {
+  const userId = req.user?.userId;
+  const communityId = Number(req.params.id);
+  const requestId = Number(req.params.requestId);
+
+  try {
+    const membership = await prisma.communityMembership.findUnique({
+      where: { userId_communityId: { userId, communityId } },
+    });
+
+    if (!membership || membership.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
+
+    const request = await prisma.communityJoinRequest.findUnique({
+      where: { id: requestId },
+    });
+
+    if (!request || request.communityId !== communityId) {
+      return res.status(404).json({ error: 'Solicitud no encontrada.' });
+    }
+
+    await prisma.communityMembership.create({
+      data: {
+        userId: request.userId,
+        communityId,
+        role: 'MEMBER',
+      },
+    });
+
+    await prisma.communityJoinRequest.delete({
+      where: { id: requestId },
+    });
+
+    res.json({ message: 'Solicitud aceptada correctamente.' });
+  } catch (error) {
+    console.error('Error al aceptar solicitud:', error);
+    res.status(500).json({ error: 'Error interno' });
+  }
+}) as RequestHandler);
+
+// 📌 Rechazar solicitud de unión
+communitiesRouter.delete('/:id/join-requests/:requestId', (async (req: AuthRequest, res: Response) => {
+  const userId = req.user?.userId;
+  const communityId = Number(req.params.id);
+  const requestId = Number(req.params.requestId);
+
+  try {
+    const membership = await prisma.communityMembership.findUnique({
+      where: { userId_communityId: { userId, communityId } },
+    });
+
+    if (!membership || membership.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
+
+    await prisma.communityJoinRequest.delete({
+      where: { id: requestId },
+    });
+
+    res.json({ message: 'Solicitud rechazada correctamente.' });
+  } catch (error) {
+    console.error('Error al rechazar solicitud:', error);
+    res.status(500).json({ error: 'Error interno' });
+  }
+}) as RequestHandler);
+
+
+
+
+
+
+
 export default communitiesRouter;
