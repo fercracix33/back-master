@@ -97,8 +97,10 @@ communitiesRouter.get('/me', (async (req: Request, res: Response) => {
 }) as RequestHandler);
 
 // Obtener comunidad específica
+// Obtener comunidad específica con isMember
 communitiesRouter.get('/:id', (async (req: Request, res: Response) => {
   const communityId = Number(req.params.id);
+  const userId = (req as AuthRequest).user?.userId;
 
   try {
     const community = await prisma.community.findUnique({
@@ -115,12 +117,15 @@ communitiesRouter.get('/:id', (async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Comunidad no encontrada' });
     }
 
-    res.json(community);
+    const isMember = community.members.some((m: any) => m.user.id === userId);
+
+    res.json({ ...community, isMember });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Error interno' });
   }
 }) as RequestHandler);
+
 
 // Actualizar comunidad
 communitiesRouter.patch('/:id', (async (req: Request, res: Response) => {
@@ -297,6 +302,68 @@ communitiesRouter.delete('/:id/join-requests/:requestId', (async (req: AuthReque
     res.status(500).json({ error: 'Error interno' });
   }
 }) as RequestHandler);
+
+
+
+// 📌 Unirse a una comunidad (automáticamente si es pública, solicitud si es privada)
+communitiesRouter.post('/:id/join', (async (req: AuthRequest, res: Response) => {
+  const userId = req.user?.userId;
+  const communityId = Number(req.params.id);
+
+  try {
+    // 1. ¿Ya es miembro?
+    const isMember = await prisma.communityMembership.findUnique({
+      where: { userId_communityId: { userId, communityId } },
+    });
+
+    if (isMember) {
+      return res.status(200).json({ message: 'Ya eres miembro de esta comunidad.' });
+    }
+
+    // 2. ¿Existe la comunidad?
+    const community = await prisma.community.findUnique({
+      where: { id: communityId },
+      select: { visibility: true },
+    });
+
+    if (!community) {
+      return res.status(404).json({ error: 'Comunidad no encontrada.' });
+    }
+
+    // 3. Si es pública, unir directamente
+    if (community.visibility === 'PUBLIC') {
+      const membership = await prisma.communityMembership.create({
+        data: {
+          userId,
+          communityId,
+          role: 'MEMBER',
+        },
+      });
+
+      return res.status(201).json({ message: 'Te has unido a la comunidad.', membership });
+    }
+
+    // 4. Si es privada, ¿ya ha solicitado unirse?
+    const existingRequest = await prisma.communityJoinRequest.findUnique({
+      where: { userId_communityId: { userId, communityId } },
+    });
+
+    if (existingRequest) {
+      return res.status(200).json({ message: 'Ya has solicitado unirte a esta comunidad privada.' });
+    }
+
+    // 5. Crear nueva solicitud
+    const newRequest = await prisma.communityJoinRequest.create({
+      data: { userId, communityId },
+    });
+
+    return res.status(201).json({ message: 'Solicitud enviada correctamente.', request: newRequest });
+  } catch (error) {
+    console.error('Error al procesar la unión:', error);
+    res.status(500).json({ error: 'Error interno al intentar unirse a la comunidad.' });
+  }
+}) as RequestHandler);
+
 
 
 
