@@ -365,9 +365,150 @@ communitiesRouter.post('/:id/join', (async (req: AuthRequest, res: Response) => 
 }) as RequestHandler);
 
 
+// 📌 Obtener miembros de la comunidad con sus roles
+communitiesRouter.get('/:id/members', (async (req: AuthRequest, res: Response) => {
+  const communityId = Number(req.params.id);
+  const userId = req.user?.userId;
+
+  try {
+    const membership = await prisma.communityMembership.findUnique({
+      where: { userId_communityId: { userId, communityId } },
+    });
+
+    if (!membership) {
+      return res.status(403).json({ error: 'No perteneces a esta comunidad.' });
+    }
+
+    const members = await prisma.communityMembership.findMany({
+      where: { communityId },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    res.json(members);
+  } catch (error) {
+    console.error('Error al obtener miembros:', error);
+    res.status(500).json({ error: 'Error interno al obtener miembros.' });
+  }
+}) as RequestHandler);
+
+// 📌 Ascender a moderador (solo ADMIN)
+communitiesRouter.patch('/:id/promote/:userId', (async (req: AuthRequest, res: Response) => {
+  const communityId = Number(req.params.id);
+  const userId = Number(req.params.userId);
+  const requesterId = req.user?.userId;
+
+  try {
+    const requesterMembership = await prisma.communityMembership.findUnique({
+      where: { userId_communityId: { userId: requesterId, communityId } },
+    });
+
+    if (!requesterMembership || requesterMembership.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Solo el ADMIN puede promover a moderadores.' });
+    }
+
+    const updated = await prisma.communityMembership.update({
+      where: { userId_communityId: { userId, communityId } },
+      data: { role: 'MODERATOR' },
+    });
+
+    res.json({ message: 'Usuario ascendido a moderador.', updated });
+  } catch (error) {
+    console.error('Error al promover usuario:', error);
+    res.status(500).json({ error: 'Error interno al promover usuario.' });
+  }
+}) as RequestHandler);
+
+// 📌 Degradar a miembro (solo ADMIN)
+communitiesRouter.patch('/:id/demote/:userId', (async (req: AuthRequest, res: Response) => {
+  const communityId = Number(req.params.id);
+  const userId = Number(req.params.userId);
+  const requesterId = req.user?.userId;
+
+  try {
+    const requesterMembership = await prisma.communityMembership.findUnique({
+      where: { userId_communityId: { userId: requesterId, communityId } },
+    });
+
+    if (!requesterMembership || requesterMembership.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Solo el ADMIN puede degradar a moderadores.' });
+    }
+
+    const updated = await prisma.communityMembership.update({
+      where: { userId_communityId: { userId, communityId } },
+      data: { role: 'MEMBER' },
+    });
+
+    res.json({ message: 'Moderador degradado a miembro.', updated });
+  } catch (error) {
+    console.error('Error al degradar usuario:', error);
+    res.status(500).json({ error: 'Error interno al degradar usuario.' });
+  }
+}) as RequestHandler);
+
+// 📌 Expulsar miembro (ADMIN y MOD pueden, excepto al ADMIN)
+communitiesRouter.delete('/:id/kick/:userId', (async (req: AuthRequest, res: Response) => {
+  const communityId = Number(req.params.id);
+  const userIdToKick = Number(req.params.userId);
+  const requesterId = req.user?.userId;
+
+  try {
+    const requesterMembership = await prisma.communityMembership.findUnique({
+      where: { userId_communityId: { userId: requesterId, communityId } },
+    });
+
+    if (!requesterMembership || (requesterMembership.role !== 'ADMIN' && requesterMembership.role !== 'MODERATOR')) {
+      return res.status(403).json({ error: 'No tienes permiso para expulsar usuarios.' });
+    }
+
+    const targetMembership = await prisma.communityMembership.findUnique({
+      where: { userId_communityId: { userId: userIdToKick, communityId } },
+    });
+
+    if (!targetMembership) {
+      return res.status(404).json({ error: 'El usuario no es miembro de esta comunidad.' });
+    }
+
+    if (targetMembership.role === 'ADMIN') {
+      return res.status(403).json({ error: 'No puedes expulsar al ADMIN.' });
+    }
+
+    await prisma.communityMembership.delete({
+      where: { userId_communityId: { userId: userIdToKick, communityId } },
+    });
+
+    res.json({ message: 'Usuario expulsado de la comunidad.' });
+  } catch (error) {
+    console.error('Error al expulsar usuario:', error);
+    res.status(500).json({ error: 'Error interno al expulsar usuario.' });
+  }
+}) as RequestHandler);
 
 
 
+communitiesRouter.delete('/:id/leave', (async (req: AuthRequest, res: Response) => {
+  const userId = req.user?.userId;
+  const communityId = Number(req.params.id);
+
+  const membership = await prisma.communityMembership.findUnique({
+    where: { userId_communityId: { userId, communityId } },
+  });
+
+  if (!membership) {
+    return res.status(404).json({ error: 'No perteneces a esta comunidad.' });
+  }
+
+  if (membership.role === 'ADMIN') {
+    return res.status(403).json({ error: 'El ADMIN no puede abandonar la comunidad. Debe eliminarla o transferir la administración.' });
+  }
+
+  await prisma.communityMembership.delete({
+    where: { userId_communityId: { userId, communityId } },
+  });
+
+  res.json({ message: 'Has salido de la comunidad.' });
+}) as RequestHandler);
 
 
 
