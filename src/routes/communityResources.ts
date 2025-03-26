@@ -121,12 +121,24 @@ communityResourcesRouter.get('/:id/detail', (async (req: AuthRequest, res: Respo
     }
 
     let data: any = null;
+
     if (communityResource.type === 'NOTE') {
       data = await prisma.note.findUnique({ where: { id: communityResource.resourceId } });
+
     } else if (communityResource.type === 'FILE') {
-      data = await prisma.file.findUnique({ where: { id: communityResource.resourceId } });
+      const file = await prisma.file.findUnique({ where: { id: communityResource.resourceId } });
+
+      if (!file) return res.status(404).json({ error: 'Archivo no encontrado.' });
+
+      const { data: urlData } = supabase.storage.from('files').getPublicUrl(file.path);
+
+      data = {
+        ...file,
+        downloadUrl: urlData.publicUrl,
+      };
+
     } else if (communityResource.type === 'FOLDER') {
-      data = await prisma.folder.findUnique({
+      const folder = await prisma.folder.findUnique({
         where: { id: communityResource.resourceId },
         include: {
           notes: true,
@@ -134,6 +146,22 @@ communityResourcesRouter.get('/:id/detail', (async (req: AuthRequest, res: Respo
           children: true,
         },
       });
+
+      if (!folder) return res.status(404).json({ error: 'Carpeta no encontrada.' });
+
+      // Añadir downloadUrl a cada archivo en la carpeta
+      const filesWithUrls = await Promise.all(folder.files.map(async (file: any) => {
+        const { data: urlData } = supabase.storage.from('files').getPublicUrl(file.path);
+        return {
+          ...file,
+          downloadUrl: urlData.publicUrl,
+        };
+      }));
+
+      data = {
+        ...folder,
+        files: filesWithUrls,
+      };
     }
 
     if (!data) {
@@ -153,6 +181,7 @@ communityResourcesRouter.get('/:id/detail', (async (req: AuthRequest, res: Respo
     res.status(500).json({ error: 'Error al obtener detalle del recurso.' });
   }
 }) as RequestHandler);
+
 
 // 📌 Eliminar recurso de comunidad
 communityResourcesRouter.delete('/:resourceId', (async (req: AuthRequest, res: Response) => {
