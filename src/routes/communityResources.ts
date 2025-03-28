@@ -91,10 +91,45 @@ communityResourcesRouter.get('/:communityId', (async (req: AuthRequest, res: Res
   }
 }) as RequestHandler);
 
+// Función auxiliar para obtener carpetas de forma recursiva
+// Función auxiliar para obtener carpetas de forma recursiva
+async function getFolderRecursive(folderId: number): Promise<any> {
+  const folder = await prisma.folder.findUnique({
+    where: { id: folderId },
+    include: {
+      notes: true,
+      files: true,
+      children: true,
+    },
+  });
+
+  if (!folder) return null;
+
+  const filesWithUrls = await Promise.all(
+    folder.files.map(async (file: any) => {
+      const { data: urlData } = supabase.storage.from('files').getPublicUrl(file.path);
+      return {
+        ...file,
+        downloadUrl: urlData.publicUrl,
+      };
+    })
+  );
+
+  const children = await Promise.all(
+    folder.children.map(async (child: any) => await getFolderRecursive(child.id))
+  );
+
+  return {
+    ...folder,
+    files: filesWithUrls,
+    children,
+  };
+}
+
 // 📌 Obtener detalle completo del recurso (sin clonarlo)
-communityResourcesRouter.get('/:id/detail', (async (req: AuthRequest, res: Response) => {
+const getCommunityResourceDetail: RequestHandler = async (req, res) => {
   const resourceId = Number(req.params.id);
-  const userId = req.user?.userId;
+  const userId = (req as AuthRequest).user?.userId;
 
   try {
     const communityResource = await prisma.communityResource.findUnique({
@@ -106,7 +141,8 @@ communityResourcesRouter.get('/:id/detail', (async (req: AuthRequest, res: Respo
     });
 
     if (!communityResource) {
-      return res.status(404).json({ error: 'Recurso comunitario no encontrado.' });
+      res.status(404).json({ error: 'Recurso comunitario no encontrado.' });
+      return;
     }
 
     const community = communityResource.community;
@@ -116,56 +152,41 @@ communityResourcesRouter.get('/:id/detail', (async (req: AuthRequest, res: Respo
         where: { userId_communityId: { userId, communityId: community.id } },
       });
       if (!membership) {
-        return res.status(403).json({ error: 'No perteneces a esta comunidad.' });
+        res.status(403).json({ error: 'No perteneces a esta comunidad.' });
+        return;
       }
     }
 
     let data: any = null;
 
     if (communityResource.type === 'NOTE') {
-      data = await prisma.note.findUnique({ where: { id: communityResource.resourceId } });
+      const note = await prisma.note.findUnique({ where: { id: communityResource.resourceId } });
+      if (!note) {
+        res.status(404).json({ error: 'Nota no encontrada.' });
+        return;
+      }
+      data = note;
 
     } else if (communityResource.type === 'FILE') {
       const file = await prisma.file.findUnique({ where: { id: communityResource.resourceId } });
-
-      if (!file) return res.status(404).json({ error: 'Archivo no encontrado.' });
+      if (!file) {
+        res.status(404).json({ error: 'Archivo no encontrado.' });
+        return;
+      }
 
       const { data: urlData } = supabase.storage.from('files').getPublicUrl(file.path);
-
       data = {
         ...file,
         downloadUrl: urlData.publicUrl,
       };
 
     } else if (communityResource.type === 'FOLDER') {
-      const folder = await prisma.folder.findUnique({
-        where: { id: communityResource.resourceId },
-        include: {
-          notes: true,
-          files: true,
-          children: true,
-        },
-      });
-
-      if (!folder) return res.status(404).json({ error: 'Carpeta no encontrada.' });
-
-      // Añadir downloadUrl a cada archivo en la carpeta
-      const filesWithUrls = await Promise.all(folder.files.map(async (file: any) => {
-        const { data: urlData } = supabase.storage.from('files').getPublicUrl(file.path);
-        return {
-          ...file,
-          downloadUrl: urlData.publicUrl,
-        };
-      }));
-
-      data = {
-        ...folder,
-        files: filesWithUrls,
-      };
-    }
-
-    if (!data) {
-      return res.status(404).json({ error: 'Recurso original no encontrado.' });
+      const folderData = await getFolderRecursive(communityResource.resourceId);
+      if (!folderData) {
+        res.status(404).json({ error: 'Carpeta no encontrada.' });
+        return;
+      }
+      data = folderData;
     }
 
     res.json({
@@ -180,7 +201,11 @@ communityResourcesRouter.get('/:id/detail', (async (req: AuthRequest, res: Respo
     console.error(error);
     res.status(500).json({ error: 'Error al obtener detalle del recurso.' });
   }
-}) as RequestHandler);
+};
+
+// 📌 Asociar la ruta
+communityResourcesRouter.get('/:id/detail', getCommunityResourceDetail);
+
 
 
 // 📌 Eliminar recurso de comunidad
