@@ -3,7 +3,7 @@ import prisma from '../prisma/client';
 import { AuthRequest } from '../middleware/auth';
 import { supabase } from '../index';
 const communityResourcesRouter = Router();
-
+const bucketName = process.env.SUPABASE_BUCKET || 'uploads';
 // 📌 Añadir recurso a una comunidad (archivo, nota o carpeta)
 communityResourcesRouter.post('/', (async (req: AuthRequest, res: Response) => {
   const { communityId, resourceId, resourceType, tags, title, description } = req.body;
@@ -107,7 +107,7 @@ async function getFolderRecursive(folderId: number): Promise<any> {
 
   const filesWithUrls = await Promise.all(
     folder.files.map(async (file: any) => {
-      const { data: urlData } = supabase.storage.from('files').getPublicUrl(file.path);
+      const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(file.path);
       return {
         ...file,
         downloadUrl: urlData.publicUrl,
@@ -174,7 +174,7 @@ const getCommunityResourceDetail: RequestHandler = async (req, res) => {
         return;
       }
 
-      const { data: urlData } = supabase.storage.from('files').getPublicUrl(file.path);
+      const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(file.path);
       data = {
         ...file,
         downloadUrl: urlData.publicUrl,
@@ -345,7 +345,7 @@ async function cloneFolderRecursively(originalId: number, userId: number, parent
   // Clonar archivos
   for (const file of originalFolder.files) {
     const { data: fileData, error: downloadError } = await supabase.storage
-      .from('files')
+      .from(bucketName)
       .download(file.path);
 
     if (!fileData || downloadError) continue;
@@ -355,7 +355,7 @@ async function cloneFolderRecursively(originalId: number, userId: number, parent
     const newPath = `user-${userId}/${newFileName}`;
 
     const { error: uploadError } = await supabase.storage
-      .from('files')
+      .from(bucketName)
       .upload(newPath, buffer, { contentType: file.mimeType });
 
     if (!uploadError) {
@@ -427,7 +427,7 @@ communityResourcesRouter.post('/:id/clone', asyncHandler(async (req: AuthRequest
     if (!file) return res.status(404).json({ error: 'Archivo no encontrado.' });
 
     const { data: fileData, error: downloadError } = await supabase.storage
-      .from('files')
+      .from(bucketName)
       .download(file.path);
 
     if (!fileData || downloadError) {
@@ -439,7 +439,7 @@ communityResourcesRouter.post('/:id/clone', asyncHandler(async (req: AuthRequest
     const newPath = `user-${userId}/${newFileName}`;
 
     const { error: uploadError } = await supabase.storage
-      .from('files')
+      .from(bucketName)
       .upload(newPath, buffer, { contentType: file.mimeType });
 
     if (uploadError) {
