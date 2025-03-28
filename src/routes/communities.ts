@@ -512,4 +512,40 @@ communitiesRouter.delete('/:id/leave', (async (req: AuthRequest, res: Response) 
 
 
 
+
+
+// 📌 Obtener métricas de una comunidad (nº de miembros, recursos y hilos)
+communitiesRouter.get('/:id/metrics', (async (req: AuthRequest, res: Response) => {
+  const userId = req.user?.userId;
+  const communityId = Number(req.params.id);
+
+  try {
+    const community = await prisma.community.findUnique({ where: { id: communityId } });
+    if (!community) return res.status(404).json({ error: 'Comunidad no encontrada.' });
+
+    if (community.visibility === 'PRIVATE') {
+      const membership = await prisma.communityMembership.findUnique({
+        where: { userId_communityId: { userId, communityId } },
+      });
+      if (!membership) {
+        return res.status(403).json({ error: 'No tienes acceso a esta comunidad privada.' });
+      }
+    }
+
+    const [members, resources, threads] = await Promise.all([
+      prisma.communityMembership.count({ where: { communityId } }),
+      prisma.communityResource.count({ where: { communityId } }),
+      prisma.thread.count({ where: { communityId } }),
+    ]);
+
+    res.json({ members, resources, threads });
+  } catch (error) {
+    console.error('Error al obtener métricas:', error);
+    res.status(500).json({ error: 'Error interno al obtener métricas.' });
+  }
+}) as RequestHandler);
+
+
+
+
 export default communitiesRouter;
