@@ -4,10 +4,9 @@ import { AuthRequest } from '../middleware/auth';
 
 const communityThreadsRouter = Router();
 
-// 📌 Obtener detalles de un hilo específico (primero para evitar conflicto con /:communityId)
+// 📌 Obtener detalles de un hilo específico
 communityThreadsRouter.get('/thread/:threadId', (async (req: AuthRequest, res: Response) => {
   const threadId = Number(req.params.threadId);
-
   console.log('[GET] Obtener detalles del hilo:', threadId);
 
   if (isNaN(threadId)) {
@@ -32,83 +31,34 @@ communityThreadsRouter.get('/thread/:threadId', (async (req: AuthRequest, res: R
   }
 }) as RequestHandler);
 
-// 📌 Crear un hilo en una comunidad
-communityThreadsRouter.post('/', (async (req: AuthRequest, res: Response) => {
-  const { communityId, title, content } = req.body;
+// 📌 Eliminar un hilo
+communityThreadsRouter.delete('/thread/:threadId', (async (req: AuthRequest, res: Response) => {
+  const threadId = Number(req.params.threadId);
   const userId = req.user?.userId;
-
-  console.log('[POST] Crear hilo:', { communityId, title, userId, content });
+  console.log('[DELETE] Eliminar hilo:', { threadId, userId });
 
   if (!userId) return res.status(401).json({ error: 'No autenticado.' });
-  if (!communityId || !title || !content) {
-    return res.status(400).json({ error: 'Faltan parámetros obligatorios.' });
-  }
+  if (isNaN(threadId)) return res.status(400).json({ error: 'ID de hilo inválido.' });
 
   try {
+    const thread = await prisma.communityThread.findUnique({ where: { id: threadId } });
+    if (!thread) return res.status(404).json({ error: 'Hilo no encontrado.' });
+
     const membership = await prisma.communityMembership.findUnique({
-      where: { userId_communityId: { userId, communityId } },
+      where: { userId_communityId: { userId, communityId: thread.communityId } },
     });
 
-    if (!membership) {
-      return res.status(403).json({ error: 'No perteneces a esta comunidad.' });
+    if (!membership || (membership.role === 'MEMBER' && thread.authorId !== userId)) {
+      return res.status(403).json({ error: 'No tienes permiso para eliminar este hilo.' });
     }
 
-    const thread = await prisma.communityThread.create({
-      data: {
-        communityId,
-        title,
-        content,
-        authorId: userId,
-      },
-    });
+    await prisma.communityThread.delete({ where: { id: threadId } });
 
-    console.log('[POST] Hilo creado:', thread);
-    res.status(201).json(thread);
+    console.log('[DELETE] Hilo eliminado');
+    res.json({ message: 'Hilo eliminado correctamente.' });
   } catch (error) {
-    console.error('❌ Error al crear hilo:', error);
-    res.status(500).json({ error: 'Error al crear hilo.' });
-  }
-}) as RequestHandler);
-
-// 📌 Obtener todos los hilos de una comunidad
-communityThreadsRouter.get('/:communityId', (async (req: AuthRequest, res: Response) => {
-  const communityId = Number(req.params.communityId);
-  const userId = req.user?.userId;
-
-  console.log('[GET] Obtener hilos de comunidad:', { communityId, userId });
-
-  if (isNaN(communityId)) {
-    return res.status(400).json({ error: 'ID de comunidad inválido.' });
-  }
-
-  try {
-    const community = await prisma.community.findUnique({ where: { id: communityId } });
-    if (!community) return res.status(404).json({ error: 'Comunidad no encontrada.' });
-
-    if (community.visibility === 'PRIVATE') {
-      const membership = await prisma.communityMembership.findUnique({
-        where: { userId_communityId: { userId, communityId } },
-      });
-
-      if (!membership) {
-        return res.status(403).json({ error: 'No tienes acceso a los hilos de esta comunidad.' });
-      }
-    }
-
-    const threads = await prisma.communityThread.findMany({
-      where: { communityId },
-      include: {
-        author: { select: { id: true, name: true } },
-        comments: { include: { author: { select: { id: true, name: true } } } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    console.log('[GET] Hilos encontrados:', threads.length);
-    res.json(threads);
-  } catch (error) {
-    console.error('❌ Error al obtener hilos:', error);
-    res.status(500).json({ error: 'Error interno al obtener hilos.' });
+    console.error('❌ Error al eliminar hilo:', error);
+    res.status(500).json({ error: 'Error interno al eliminar hilo.' });
   }
 }) as RequestHandler);
 
@@ -117,7 +67,6 @@ communityThreadsRouter.post('/:threadId/comments', (async (req: AuthRequest, res
   const threadId = Number(req.params.threadId);
   const userId = req.user?.userId;
   const { content } = req.body;
-
   console.log('[POST] Comentar hilo:', { threadId, userId, content });
 
   if (!userId) return res.status(401).json({ error: 'No autenticado.' });
@@ -152,35 +101,81 @@ communityThreadsRouter.post('/:threadId/comments', (async (req: AuthRequest, res
   }
 }) as RequestHandler);
 
-// 📌 Eliminar un hilo
-communityThreadsRouter.delete('/thread/:threadId', (async (req: AuthRequest, res: Response) => {
-  const threadId = Number(req.params.threadId);
+// 📌 Crear un hilo en una comunidad
+communityThreadsRouter.post('/', (async (req: AuthRequest, res: Response) => {
+  const { communityId, title, content } = req.body;
   const userId = req.user?.userId;
-
-  console.log('[DELETE] Eliminar hilo:', { threadId, userId });
+  console.log('[POST] Crear hilo:', { communityId, title, userId, content });
 
   if (!userId) return res.status(401).json({ error: 'No autenticado.' });
-  if (isNaN(threadId)) return res.status(400).json({ error: 'ID de hilo inválido.' });
+  if (!communityId || !title || !content) {
+    return res.status(400).json({ error: 'Faltan parámetros obligatorios.' });
+  }
 
   try {
-    const thread = await prisma.communityThread.findUnique({ where: { id: threadId } });
-    if (!thread) return res.status(404).json({ error: 'Hilo no encontrado.' });
-
     const membership = await prisma.communityMembership.findUnique({
-      where: { userId_communityId: { userId, communityId: thread.communityId } },
+      where: { userId_communityId: { userId, communityId } },
     });
 
-    if (!membership || (membership.role === 'MEMBER' && thread.authorId !== userId)) {
-      return res.status(403).json({ error: 'No tienes permiso para eliminar este hilo.' });
+    if (!membership) {
+      return res.status(403).json({ error: 'No perteneces a esta comunidad.' });
     }
 
-    await prisma.communityThread.delete({ where: { id: threadId } });
+    const thread = await prisma.communityThread.create({
+      data: {
+        communityId,
+        title,
+        content,
+        authorId: userId,
+      },
+    });
 
-    console.log('[DELETE] Hilo eliminado');
-    res.json({ message: 'Hilo eliminado correctamente.' });
+    console.log('[POST] Hilo creado:', thread);
+    res.status(201).json(thread);
   } catch (error) {
-    console.error('❌ Error al eliminar hilo:', error);
-    res.status(500).json({ error: 'Error interno al eliminar hilo.' });
+    console.error('❌ Error al crear hilo:', error);
+    res.status(500).json({ error: 'Error al crear hilo.' });
+  }
+}) as RequestHandler);
+
+// 📌 Obtener todos los hilos de una comunidad (última ruta para evitar conflictos)
+communityThreadsRouter.get('/:communityId', (async (req: AuthRequest, res: Response) => {
+  const communityId = Number(req.params.communityId);
+  const userId = req.user?.userId;
+  console.log('[GET] Obtener hilos de comunidad:', { communityId, userId });
+
+  if (isNaN(communityId)) {
+    return res.status(400).json({ error: 'ID de comunidad inválido.' });
+  }
+
+  try {
+    const community = await prisma.community.findUnique({ where: { id: communityId } });
+    if (!community) return res.status(404).json({ error: 'Comunidad no encontrada.' });
+
+    if (community.visibility === 'PRIVATE') {
+      const membership = await prisma.communityMembership.findUnique({
+        where: { userId_communityId: { userId, communityId } },
+      });
+
+      if (!membership) {
+        return res.status(403).json({ error: 'No tienes acceso a los hilos de esta comunidad.' });
+      }
+    }
+
+    const threads = await prisma.communityThread.findMany({
+      where: { communityId },
+      include: {
+        author: { select: { id: true, name: true } },
+        comments: { include: { author: { select: { id: true, name: true } } } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    console.log('[GET] Hilos encontrados:', threads.length);
+    res.json(threads);
+  } catch (error) {
+    console.error('❌ Error al obtener hilos:', error);
+    res.status(500).json({ error: 'Error interno al obtener hilos.' });
   }
 }) as RequestHandler);
 
