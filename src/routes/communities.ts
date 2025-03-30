@@ -534,7 +534,7 @@ communitiesRouter.get('/:id/metrics', (async (req: AuthRequest, res: Response) =
     const [members, resources, threads] = await Promise.all([
       prisma.communityMembership.count({ where: { communityId } }),
       prisma.communityResource.count({ where: { communityId } }),
-      prisma.thread.count({ where: { communityId } }),
+      prisma.communityThread.count({ where: { communityId } }),
     ]);
 
     const metrics: any = { members, resources, threads };
