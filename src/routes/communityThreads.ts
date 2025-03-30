@@ -1,8 +1,36 @@
-import { Router, Request, Response, RequestHandler } from 'express';
+import { Router, Response, RequestHandler } from 'express';
 import prisma from '../prisma/client';
 import { AuthRequest } from '../middleware/auth';
 
 const communityThreadsRouter = Router();
+
+// 📌 Obtener detalles de un hilo específico (primero para evitar conflicto con /:communityId)
+communityThreadsRouter.get('/thread/:threadId', (async (req: AuthRequest, res: Response) => {
+  const threadId = Number(req.params.threadId);
+
+  console.log('[GET] Obtener detalles del hilo:', threadId);
+
+  if (isNaN(threadId)) {
+    return res.status(400).json({ error: 'ID de hilo inválido.' });
+  }
+
+  try {
+    const thread = await prisma.communityThread.findUnique({
+      where: { id: threadId },
+      include: {
+        author: { select: { id: true, name: true } },
+        comments: { include: { author: { select: { id: true, name: true } } } },
+      },
+    });
+
+    if (!thread) return res.status(404).json({ error: 'Hilo no encontrado.' });
+
+    res.json(thread);
+  } catch (error) {
+    console.error('❌ Error al obtener detalles del hilo:', error);
+    res.status(500).json({ error: 'Error al obtener detalles del hilo.' });
+  }
+}) as RequestHandler);
 
 // 📌 Crear un hilo en una comunidad
 communityThreadsRouter.post('/', (async (req: AuthRequest, res: Response) => {
@@ -81,34 +109,6 @@ communityThreadsRouter.get('/:communityId', (async (req: AuthRequest, res: Respo
   } catch (error) {
     console.error('❌ Error al obtener hilos:', error);
     res.status(500).json({ error: 'Error interno al obtener hilos.' });
-  }
-}) as RequestHandler);
-
-// 📌 Obtener detalles de un hilo específico
-communityThreadsRouter.get('/thread/:threadId', (async (req: AuthRequest, res: Response) => {
-  const threadId = Number(req.params.threadId);
-
-  console.log('[GET] Obtener detalles del hilo:', threadId);
-
-  if (isNaN(threadId)) {
-    return res.status(400).json({ error: 'ID de hilo inválido.' });
-  }
-
-  try {
-    const thread = await prisma.communityThread.findUnique({
-      where: { id: threadId },
-      include: {
-        author: { select: { id: true, name: true } },
-        comments: { include: { author: { select: { id: true, name: true } } } },
-      },
-    });
-
-    if (!thread) return res.status(404).json({ error: 'Hilo no encontrado.' });
-
-    res.json(thread);
-  } catch (error) {
-    console.error('❌ Error al obtener detalles del hilo:', error);
-    res.status(500).json({ error: 'Error al obtener detalles del hilo.' });
   }
 }) as RequestHandler);
 

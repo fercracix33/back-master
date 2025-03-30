@@ -529,7 +529,7 @@ communitiesRouter.get('/:id/metrics', (async (req: AuthRequest, res: Response) =
       return res.status(404).json({ error: 'Comunidad no encontrada.' });
     }
 
-    console.log('[GET /:id/metrics] Comunidad encontrada. Recolectando métricas...');
+    console.log('[GET /:id/metrics] Comunidad encontrada. Recolectando métricas... Nig');
 
     const [members, resources, threads] = await Promise.all([
       prisma.communityMembership.count({ where: { communityId } }),
