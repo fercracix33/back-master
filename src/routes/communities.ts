@@ -514,23 +514,22 @@ communitiesRouter.delete('/:id/leave', (async (req: AuthRequest, res: Response) 
 
 
 
-// 📌 Obtener métricas de una comunidad (nº de miembros, recursos y hilos)
+// 📌 Obtener métricas de una comunidad (nº de miembros, recursos, hilos y solicitudes)
 communitiesRouter.get('/:id/metrics', (async (req: AuthRequest, res: Response) => {
   const userId = req.user?.userId;
   const communityId = Number(req.params.id);
 
+  console.log('[GET /:id/metrics] Obteniendo métricas para la comunidad:', communityId);
+
   try {
     const community = await prisma.community.findUnique({ where: { id: communityId } });
-    if (!community) return res.status(404).json({ error: 'Comunidad no encontrada.' });
 
-    if (community.visibility === 'PRIVATE') {
-      const membership = await prisma.communityMembership.findUnique({
-        where: { userId_communityId: { userId, communityId } },
-      });
-      if (!membership) {
-        return res.status(403).json({ error: 'No tienes acceso a esta comunidad privada.' });
-      }
+    if (!community) {
+      console.warn('[GET /:id/metrics] Comunidad no encontrada:', communityId);
+      return res.status(404).json({ error: 'Comunidad no encontrada.' });
     }
+
+    console.log('[GET /:id/metrics] Comunidad encontrada. Recolectando métricas...');
 
     const [members, resources, threads] = await Promise.all([
       prisma.communityMembership.count({ where: { communityId } }),
@@ -538,12 +537,28 @@ communitiesRouter.get('/:id/metrics', (async (req: AuthRequest, res: Response) =
       prisma.thread.count({ where: { communityId } }),
     ]);
 
-    res.json({ members, resources, threads });
-  } catch (error) {
-    console.error('Error al obtener métricas:', error);
+    const metrics: any = { members, resources, threads };
+
+    if (userId) {
+      const membership = await prisma.communityMembership.findUnique({
+        where: { userId_communityId: { userId, communityId } },
+      });
+
+      if (membership?.role === 'ADMIN') {
+        const joinRequests = await prisma.communityJoinRequest.count({ where: { communityId } });
+        metrics.joinRequests = joinRequests;
+      }
+    }
+
+    console.log('[GET /:id/metrics] Métricas finalizadas:', metrics);
+
+    res.json(metrics);
+  } catch (error: any) {
+    console.error('[GET /:id/metrics] Error interno:', error.message, error.stack);
     res.status(500).json({ error: 'Error interno al obtener métricas.' });
   }
 }) as RequestHandler);
+
 
 
 
