@@ -309,7 +309,14 @@ function asyncHandler(fn: Function): RequestHandler {
 
 
 // Función auxiliar para clonar una carpeta de forma recursiva
-async function cloneFolderRecursively(originalId: number, userId: number, parentId: number | null): Promise<number> {
+// 📌 Clonar una carpeta recursivamente dentro de otra
+async function cloneFolderRecursively(
+  originalId: number,
+  userId: number,
+  parentId: number | null
+): Promise<number> {
+  console.log(`🔄 Clonando carpeta ${originalId} dentro de ${parentId}`);
+
   const originalFolder = await prisma.folder.findUnique({
     where: { id: originalId },
     include: {
@@ -329,7 +336,6 @@ async function cloneFolderRecursively(originalId: number, userId: number, parent
     },
   });
 
-  // Clonar notas
   for (const note of originalFolder.notes) {
     await prisma.note.create({
       data: {
@@ -342,13 +348,16 @@ async function cloneFolderRecursively(originalId: number, userId: number, parent
     });
   }
 
-  // Clonar archivos
   for (const file of originalFolder.files) {
+    console.log(`📥 Descargando archivo ${file.name}`);
     const { data: fileData, error: downloadError } = await supabase.storage
       .from(bucketName)
       .download(file.path);
 
-    if (!fileData || downloadError) continue;
+    if (!fileData || downloadError) {
+      console.error(`❌ Error al descargar ${file.name}`, downloadError);
+      continue;
+    }
 
     const buffer = await fileData.arrayBuffer();
     const newFileName = `${Date.now()}-${file.name}`;
@@ -358,21 +367,23 @@ async function cloneFolderRecursively(originalId: number, userId: number, parent
       .from(bucketName)
       .upload(newPath, buffer, { contentType: file.mimeType });
 
-    if (!uploadError) {
-      await prisma.file.create({
-        data: {
-          name: newFileName,
-          path: newPath,
-          size: file.size,
-          mimeType: file.mimeType,
-          ownerId: userId,
-          folderId: newFolder.id,
-        },
-      });
+    if (uploadError) {
+      console.error(`❌ Error al subir ${newFileName}`, uploadError);
+      continue;
     }
+
+    await prisma.file.create({
+      data: {
+        name: newFileName,
+        path: newPath,
+        size: file.size,
+        mimeType: file.mimeType,
+        ownerId: userId,
+        folderId: newFolder.id,
+      },
+    });
   }
 
-  // Clonar subcarpetas recursivamente
   for (const child of originalFolder.children) {
     await cloneFolderRecursively(child.id, userId, newFolder.id);
   }
@@ -380,13 +391,22 @@ async function cloneFolderRecursively(originalId: number, userId: number, parent
   return newFolder.id;
 }
 
-
-// 📌 Clonar un recurso comunitario a tu espacio personal
+// 📌 Clonar un recurso comunitario a tu espacio personal (con carpeta destino)
 communityResourcesRouter.post('/:id/clone', asyncHandler(async (req: AuthRequest, res: Response) => {
   const resourceId = Number(req.params.id);
   const userId = req.user?.userId;
+  const destinationFolderId = req.body.destinationFolderId ?? null;
+
+  console.log(`🔁 Intentando clonar recurso ${resourceId} para usuario ${userId} en carpeta ${destinationFolderId}`);
 
   if (!userId) return res.status(401).json({ error: 'No autenticado.' });
+
+  if (destinationFolderId !== null) {
+    const destFolder = await prisma.folder.findUnique({ where: { id: destinationFolderId } });
+    if (!destFolder || destFolder.ownerId !== userId) {
+      return res.status(403).json({ error: 'Carpeta destino no válida o no pertenece al usuario.' });
+    }
+  }
 
   const resource = await prisma.communityResource.findUnique({
     where: { id: resourceId },
@@ -402,12 +422,11 @@ communityResourcesRouter.post('/:id/clone', asyncHandler(async (req: AuthRequest
     const membership = await prisma.communityMembership.findUnique({
       where: { userId_communityId: { userId, communityId: resource.communityId } },
     });
-
     if (!membership) return res.status(403).json({ error: 'No perteneces a esta comunidad.' });
   }
 
-  let cloned;
-  let clonedTags = resource.tags.map((t: any) => t.tagId);
+  let cloned: any = null;
+  const clonedTags = resource.tags.map((t:any) => t.tagId);
 
   if (resource.type === 'NOTE') {
     const note = await prisma.note.findUnique({ where: { id: resource.resourceId } });
@@ -419,6 +438,7 @@ communityResourcesRouter.post('/:id/clone', asyncHandler(async (req: AuthRequest
         content: note.content,
         authorId: userId,
         isPublic: false,
+        folderId: destinationFolderId,
       },
     });
 
@@ -431,6 +451,7 @@ communityResourcesRouter.post('/:id/clone', asyncHandler(async (req: AuthRequest
       .download(file.path);
 
     if (!fileData || downloadError) {
+      console.error(`❌ Error al descargar archivo: ${file.name}`, downloadError);
       return res.status(500).json({ error: 'Error al descargar el archivo original.' });
     }
 
@@ -443,6 +464,7 @@ communityResourcesRouter.post('/:id/clone', asyncHandler(async (req: AuthRequest
       .upload(newPath, buffer, { contentType: file.mimeType });
 
     if (uploadError) {
+      console.error(`❌ Error al subir archivo clonado: ${newFileName}`, uploadError);
       return res.status(500).json({ error: 'Error al subir el archivo clonado.' });
     }
 
@@ -453,31 +475,25 @@ communityResourcesRouter.post('/:id/clone', asyncHandler(async (req: AuthRequest
         size: file.size,
         mimeType: file.mimeType,
         ownerId: userId,
-        folderId: null,
+        folderId: destinationFolderId,
       },
     });
 
   } else if (resource.type === 'FOLDER') {
-    const folderId = await cloneFolderRecursively(resource.resourceId, userId, null);
+    const folderId = await cloneFolderRecursively(resource.resourceId, userId, destinationFolderId);
     cloned = await prisma.folder.findUnique({ where: { id: folderId } });
   }
 
-  // 🔁 Aplicar tags al recurso clonado (si aplica)
   if (cloned && clonedTags.length && resource.type !== 'FOLDER') {
+    const tagData = clonedTags.map((tagId: any) => ({
+      [resource.type === 'NOTE' ? 'noteId' : 'fileId']: cloned.id,
+      tagId,
+    }));
+
     if (resource.type === 'NOTE') {
-      await prisma.noteTag.createMany({
-        data: clonedTags.map((tagId: any) => ({
-          noteId: cloned.id,
-          tagId,
-        })),
-      });
+      await prisma.noteTag.createMany({ data: tagData });
     } else if (resource.type === 'FILE') {
-      await prisma.fileTag.createMany({
-        data: clonedTags.map((tagId: any)=> ({
-          fileId: cloned.id,
-          tagId,
-        })),
-      });
+      await prisma.fileTag.createMany({ data: tagData });
     }
   }
 
