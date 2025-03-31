@@ -156,7 +156,7 @@ model Message {
 model Notification {
   id           Int       @id @default(autoincrement())
   message      String
-  type         String?
+  type         NotificationType
   isRead       Boolean   @default(false)
   createdAt    DateTime  @default(now())
   scheduledFor DateTime?
