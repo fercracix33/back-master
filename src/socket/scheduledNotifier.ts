@@ -6,6 +6,7 @@ export default function startScheduledNotificationWorker(io: SocketIOServer) {
 
   const processNotifications = async () => {
     const now = new Date();
+    console.log(`[🕐] Hora actual del servidor: ${now.toISOString()}`);
 
     try {
       const dueNotifications = await prisma.scheduledNotification.findMany({
@@ -13,11 +14,16 @@ export default function startScheduledNotificationWorker(io: SocketIOServer) {
           sent: false,
           scheduledFor: { lte: now },
         }
+      }) as { id: number; userId: number; message: string; type: string; scheduledFor: Date }[];
+
+      console.log(`[🔍] Notificaciones vencidas encontradas: ${dueNotifications.length}`);
+      dueNotifications.forEach((n: { id: number; userId: number; message: string; type: string; scheduledFor: Date }) => {
+        console.log(`  - ID ${n.id} programada para ${n.scheduledFor.toISOString()}`);
       });
 
       for (const scheduled of dueNotifications) {
         console.log(`[📬] Procesando notificación programada ID ${scheduled.id} para user ${scheduled.userId}`);
-      
+
         try {
           // 1. Crear la notificación persistente
           const notification = await prisma.notification.create({
@@ -28,25 +34,25 @@ export default function startScheduledNotificationWorker(io: SocketIOServer) {
               scheduledFor: scheduled.scheduledFor
             }
           });
-      
+
           console.log(`[💾] Notificación persistente creada (ID: ${notification.id})`);
-      
+
           // 2. Emitir al usuario si está conectado
           io.to(`user_${scheduled.userId}`).emit('notification', notification);
           console.log(`[📡] Notificación emitida a user_${scheduled.userId}`);
-      
+
           // 3. Marcar como enviada
           await prisma.scheduledNotification.update({
             where: { id: scheduled.id },
             data: { sent: true }
           });
-      
+
           console.log(`[✅] Notificación marcada como enviada (ID: ${scheduled.id})`);
         } catch (error) {
           console.error(`❌ Error al procesar notificación ID ${scheduled.id}:`, error);
         }
       }
-      
+
     } catch (err) {
       console.error('❌ Error al procesar notificaciones programadas:', err);
     }
