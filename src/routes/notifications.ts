@@ -80,4 +80,28 @@ notificationsRouter.get('/', getNotifications);
 notificationsRouter.patch('/:id/read', markNotificationAsRead);
 notificationsRouter.delete('/:id', deleteNotification);
 
+
+// 📌 Ruta de prueba: Crear notificación manualmente
+notificationsRouter.post('/debug/create-test', (async (req, res) => {
+  const userId = (req as AuthRequest).user?.userId;
+  if (!userId) return res.status(401).json({ error: 'No autenticado' });
+
+  try {
+    const notification = await prisma.notification.create({
+      data: {
+        userId,
+        message: '🔔 Notificación de prueba',
+        type: 'EVENT',
+        scheduledFor: new Date(),
+      },
+    });
+
+    res.status(201).json({ message: 'Notificación creada', notification });
+  } catch (error) {
+    console.error('❌ Error creando notificación:', error);
+    res.status(500).json({ error: 'Error interno al crear la notificación' });
+  }
+}) as RequestHandler);
+
+
 export default notificationsRouter;
