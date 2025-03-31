@@ -16,27 +16,37 @@ export default function startScheduledNotificationWorker(io: SocketIOServer) {
       });
 
       for (const scheduled of dueNotifications) {
-        // 1. Crear notificación real persistente
-        const notification = await prisma.notification.create({
-          data: {
-            userId: scheduled.userId,
-            message: scheduled.message,
-            type: scheduled.type,
-            scheduledFor: scheduled.scheduledFor,
-          }
-        });
-
-        // 2. Emitir al socket del usuario
-        io.to(`user_${scheduled.userId}`).emit('notification', notification);
-
-        // 3. Marcar como enviada
-        await prisma.scheduledNotification.update({
-          where: { id: scheduled.id },
-          data: { sent: true }
-        });
-
-        console.log(`🔔 Notificación enviada a user_${scheduled.userId}`);
+        console.log(`[📬] Procesando notificación programada ID ${scheduled.id} para user ${scheduled.userId}`);
+      
+        try {
+          // 1. Crear la notificación persistente
+          const notification = await prisma.notification.create({
+            data: {
+              userId: scheduled.userId,
+              message: scheduled.message,
+              type: scheduled.type,
+              scheduledFor: scheduled.scheduledFor
+            }
+          });
+      
+          console.log(`[💾] Notificación persistente creada (ID: ${notification.id})`);
+      
+          // 2. Emitir al usuario si está conectado
+          io.to(`user_${scheduled.userId}`).emit('notification', notification);
+          console.log(`[📡] Notificación emitida a user_${scheduled.userId}`);
+      
+          // 3. Marcar como enviada
+          await prisma.scheduledNotification.update({
+            where: { id: scheduled.id },
+            data: { sent: true }
+          });
+      
+          console.log(`[✅] Notificación marcada como enviada (ID: ${scheduled.id})`);
+        } catch (error) {
+          console.error(`❌ Error al procesar notificación ID ${scheduled.id}:`, error);
+        }
       }
+      
     } catch (err) {
       console.error('❌ Error al procesar notificaciones programadas:', err);
     }
