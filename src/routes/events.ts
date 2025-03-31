@@ -48,24 +48,34 @@ eventsRouter.post('/', (async (req: Request, res: Response) => {
     res.status(201).json(newEvent);
 
 // Programar notificaciones diferidas
+// Programar notificaciones diferidas (con hora UTC real)
 try {
-  const eventDateTime = new Date(`${newEvent.date.toISOString().split('T')[0]}T${newEvent.startTime}`);
+  // Combinar fecha y hora de inicio como UTC
+  const [hourStr, minuteStr] = newEvent.startTime.split(':');
+  const hour = parseInt(hourStr, 10);
+  const minute = parseInt(minuteStr, 10);
+
+  const eventStart = new Date(newEvent.date);
+  eventStart.setUTCHours(hour);
+  eventStart.setUTCMinutes(minute);
+  eventStart.setUTCSeconds(0);
+  eventStart.setUTCMilliseconds(0);
+
   const reminderMs = (newEvent.reminderMinutes || 1440) * 60 * 1000;
-  const scheduledFor = new Date(eventDateTime.getTime() - reminderMs);
+  const scheduledForUTC = new Date(eventStart.getTime() - reminderMs);
 
   const scheduledNotificationsData = newEvent.participants.map((participant: { id: number }) => ({
     userId: participant.id,
     message: `Recordatorio: tienes el evento "${newEvent.title}" el ${newEvent.date.toISOString().split('T')[0]} a las ${newEvent.startTime}.`,
     type: 'EVENT',
-    scheduledFor
+    scheduledFor: scheduledForUTC
   }));
-  
 
   await prisma.scheduledNotification.createMany({
     data: scheduledNotificationsData
   });
 
-  console.log('📅 Notificaciones programadas creadas.');
+  console.log(`📅 Notificaciones programadas creadas para las ${scheduledForUTC.toISOString()}`);
 } catch (notifError) {
   console.error('❌ Error al programar notificaciones:', notifError);
 }
