@@ -46,6 +46,31 @@ eventsRouter.post('/', (async (req: Request, res: Response) => {
     });
 
     res.status(201).json(newEvent);
+
+// Programar notificaciones diferidas
+try {
+  const eventDateTime = new Date(`${newEvent.date.toISOString().split('T')[0]}T${newEvent.startTime}`);
+  const reminderMs = (newEvent.reminderMinutes || 1440) * 60 * 1000;
+  const scheduledFor = new Date(eventDateTime.getTime() - reminderMs);
+
+  const scheduledNotificationsData = newEvent.participants.map((participant: { id: number }) => ({
+    userId: participant.id,
+    message: `Recordatorio: tienes el evento "${newEvent.title}" el ${newEvent.date.toISOString().split('T')[0]} a las ${newEvent.startTime}.`,
+    type: 'EVENT',
+    scheduledFor
+  }));
+  
+
+  await prisma.scheduledNotification.createMany({
+    data: scheduledNotificationsData
+  });
+
+  console.log('📅 Notificaciones programadas creadas.');
+} catch (notifError) {
+  console.error('❌ Error al programar notificaciones:', notifError);
+}
+
+
   } catch (error) {
     console.error('Error al crear evento:', error);
     res.status(500).json({ error: 'Error interno al crear el evento.' });

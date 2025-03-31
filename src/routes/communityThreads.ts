@@ -1,6 +1,8 @@
 import { Router, Response, RequestHandler } from 'express';
 import prisma from '../prisma/client';
 import { AuthRequest } from '../middleware/auth';
+import eventBus from '../socket/eventBus';
+
 
 const communityThreadsRouter = Router();
 
@@ -109,6 +111,11 @@ communityThreadsRouter.post('/:threadId/comments', (async (req: AuthRequest, res
 
     console.log('[POST] Comentario creado:', comment);
     res.status(201).json(comment);
+    eventBus.emit('threadCommentCreated', {
+      threadId: thread.id,
+      commenterId: userId
+    });
+    
   } catch (error) {
     console.error('❌ Error al comentar en el hilo:', error);
     res.status(500).json({ error: 'Error interno al añadir comentario.' });

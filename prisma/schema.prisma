@@ -58,6 +58,7 @@ model User {
   threads                CommunityThread[]
   threadComments         ThreadComment[]
   ownedCommunities       Community[]            @relation("OwnedCommunities")
+  scheduledNotifications ScheduledNotification[]
 }
 
 // ✅ Modelo de Nota
@@ -309,4 +310,26 @@ model CommunityTag {
   tagId       Int
 
   @@unique([communityId, tagId])
+}
+
+
+enum NotificationType {
+  CHAT
+  EVENT
+  RESOURCE
+  THREAD
+  FRIEND
+}
+
+
+model ScheduledNotification {
+  id           Int       @id @default(autoincrement())
+  userId       Int
+  message      String
+  type         NotificationType
+  scheduledFor DateTime
+  sent         Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+
+  user         User      @relation(fields: [userId], references: [id])
 }

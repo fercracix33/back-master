@@ -2,6 +2,8 @@ import { Router, Request, Response, RequestHandler } from 'express';
 import prisma from '../prisma/client';
 import { AuthRequest } from '../middleware/auth';
 import { supabase } from '../index';
+import eventBus from '../socket/eventBus';
+
 const communityResourcesRouter = Router();
 const bucketName = process.env.SUPABASE_BUCKET || 'uploads';
 // 📌 Añadir recurso a una comunidad (archivo, nota o carpeta)
@@ -55,6 +57,11 @@ communityResourcesRouter.post('/', (async (req: AuthRequest, res: Response) => {
     });
 
     res.status(201).json(resource);
+    eventBus.emit('resourceAdded', {
+      resource,
+      authorId: userId
+    });
+    
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Error al añadir recurso comunitario.' });

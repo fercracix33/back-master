@@ -1,6 +1,8 @@
 import { Router, Request, Response, RequestHandler } from 'express';
 import prisma from '../prisma/client';
 import { AuthRequest } from '../middleware/auth';
+import eventBus from '../socket/eventBus';
+
 
 const friendsRouter = Router();
 
@@ -30,7 +32,16 @@ friendsRouter.post('/requests', (async (req: Request, res: Response) => {
       }
     });
 
+
+    
     res.status(201).json(newRequest);
+    eventBus.emit('friendRequestCreated', {
+      fromUserId: userId,
+      toUserId: Number(friendId),
+      requestId: newRequest.id
+    });
+    
+    
   } catch (error) {
     console.error('Error al enviar solicitud de amistad:', error);
     res.status(500).json({ error: 'Error interno al enviar la solicitud.' });
@@ -59,6 +70,11 @@ friendsRouter.patch('/requests/:id/accept', (async (req: Request, res: Response)
     });
 
     res.json(updatedRequest);
+    eventBus.emit('friendRequestAccepted', {
+      requesterId: request.userId,
+      accepterId: userId
+    });
+    
   } catch (error) {
     console.error('Error al aceptar solicitud de amistad:', error);
     res.status(500).json({ error: 'Error interno al aceptar la solicitud.' });

@@ -1,6 +1,7 @@
 import { Router, Response, RequestHandler } from 'express';
 import prisma from '../prisma/client';
 import { AuthRequest } from '../middleware/auth';
+import eventBus from '../socket/eventBus';
 
 const chatRouter = Router();
 
@@ -34,6 +35,11 @@ const createChat: RequestHandler = async (req, res): Promise<void> => {
     });
 
     res.status(201).json(newChat);
+    eventBus.emit('chatCreated', {
+      chat: newChat,
+      creatorId: userId
+    });
+    
   } catch (error) {
     console.error('Error al crear el chat:', error);
     res.status(500).json({ error: 'Error interno del servidor.' });

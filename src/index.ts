@@ -22,6 +22,8 @@ import communitiesRouter from './routes/communities';
 import communityResourcesRouter from './routes/communityResources';
 import communityThreadsRouter from './routes/communityThreads';
 import tagsRouter from './routes/tags';
+import configureSockets from './socket/index';
+import startScheduledNotificationWorker from './socket/scheduledNotifier';
 
 dotenv.config(); // Cargar variables de entorno
 
@@ -36,8 +38,10 @@ const server = http.createServer(app);
 const io = new SocketIOServer(server, {
   cors: { origin: '*' },
 });
-app.set('io', io);
 
+app.set('io', io);
+configureSockets(io);
+startScheduledNotificationWorker(io);
 // 📌 Middleware global
 const localStoragePath = process.env.LOCAL_STORAGE_PATH || path.join(__dirname, '..', 'notas-locales');
 fs.ensureDirSync(localStoragePath);
@@ -104,23 +108,6 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   res.status(err.status || 500).json({ error: err.message || 'Error interno del servidor' });
 });
 
-// 📌 Middleware de autenticación para WebSockets
-io.use(socketAuthMiddleware);
 
-// 📌 Eventos de WebSocket
-io.on('connection', (socket) => {
-  console.log(`⚡️ [WebSocket] Cliente conectado: ${socket.id}, Usuario: ${socket.data.userId}`);
-
-  // Join personal room for user notifications
-  socket.join(`user_${socket.data.userId}`);
-
-  socket.on('joinChat', (chatId: string) => {
-    socket.join(`chat_${chatId}`);
-  });
-
-  socket.on('disconnect', () => {
-    console.log(`Cliente desconectado: ${socket.id}`);
-  });
-});
 
 startServer();
