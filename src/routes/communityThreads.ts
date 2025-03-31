@@ -67,28 +67,42 @@ communityThreadsRouter.post('/:threadId/comments', (async (req: AuthRequest, res
   const threadId = Number(req.params.threadId);
   const userId = req.user?.userId;
   const { content } = req.body;
+
   console.log('[POST] Comentar hilo:', { threadId, userId, content });
 
   if (!userId) return res.status(401).json({ error: 'No autenticado.' });
   if (isNaN(threadId)) return res.status(400).json({ error: 'ID de hilo inválido.' });
-  if (!content) return res.status(400).json({ error: 'El comentario no puede estar vacío.' });
+  if (!content || typeof content !== 'string' || !content.trim()) {
+    return res.status(400).json({ error: 'El comentario no puede estar vacío.' });
+  }
 
   try {
-    const thread = await prisma.communityThread.findUnique({ where: { id: threadId } });
-    if (!thread) return res.status(404).json({ error: 'Hilo no encontrado.' });
+    const thread = await prisma.communityThread.findUnique({
+      where: { id: threadId },
+    });
+
+    if (!thread) {
+      return res.status(404).json({ error: 'Hilo no encontrado.' });
+    }
 
     const membership = await prisma.communityMembership.findUnique({
-      where: { userId_communityId: { userId, communityId: thread.communityId } },
+      where: {
+        userId_communityId: {
+          userId,
+          communityId: thread.communityId,
+        },
+      },
     });
 
     if (!membership) {
       return res.status(403).json({ error: 'No tienes permiso para comentar en este hilo.' });
     }
 
-    const comment = await prisma.communityThreadComment.create({
+    // ✅ Modelo corregido: prisma.threadComment
+    const comment = await prisma.threadComment.create({
       data: {
-        threadId,
-        content,
+        threadId: thread.id,
+        content: content.trim(),
         authorId: userId,
       },
     });
@@ -100,6 +114,7 @@ communityThreadsRouter.post('/:threadId/comments', (async (req: AuthRequest, res
     res.status(500).json({ error: 'Error interno al añadir comentario.' });
   }
 }) as RequestHandler);
+
 
 // 📌 Crear un hilo en una comunidad
 communityThreadsRouter.post('/', (async (req: AuthRequest, res: Response) => {
