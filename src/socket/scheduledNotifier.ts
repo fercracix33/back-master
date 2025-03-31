@@ -2,11 +2,11 @@ import prisma from '../prisma/client';
 import { Server as SocketIOServer } from 'socket.io';
 
 export default function startScheduledNotificationWorker(io: SocketIOServer) {
-  const intervalMs = 60 * 1000; // Cada 1 minuto
+  const intervalMs = 60 * 1000; // Ejecutar cada 1 minuto
 
   const processNotifications = async () => {
     const now = new Date();
-    console.log(`[🕐] Hora actual del servidor: ${now.toISOString()}`);
+    console.log(`[🕐] Hora actual del servidor (UTC): ${now.toISOString()}`);
 
     try {
       const dueNotifications = await prisma.scheduledNotification.findMany({
@@ -17,48 +17,48 @@ export default function startScheduledNotificationWorker(io: SocketIOServer) {
       }) as { id: number; userId: number; message: string; type: string; scheduledFor: Date }[];
 
       console.log(`[🔍] Notificaciones vencidas encontradas: ${dueNotifications.length}`);
-      dueNotifications.forEach((n: { id: number; userId: number; message: string; type: string; scheduledFor: Date }) => {
-        console.log(`  - ID ${n.id} programada para ${n.scheduledFor.toISOString()}`);
+
+      dueNotifications.forEach(n => {
+        const estado = n.scheduledFor <= now ? '✔️' : '⛔️';
+        console.log(`  ${estado} ID ${n.id} - scheduledFor: ${n.scheduledFor.toISOString()} <= now: ${now.toISOString()}`);
       });
 
       for (const scheduled of dueNotifications) {
-        console.log(`[📬] Procesando notificación programada ID ${scheduled.id} para user ${scheduled.userId}`);
+        console.log(`[📬] Procesando notificación ID ${scheduled.id} para usuario ${scheduled.userId}`);
 
         try {
-          // 1. Crear la notificación persistente
+          // Crear notificación persistente
           const notification = await prisma.notification.create({
             data: {
               userId: scheduled.userId,
               message: scheduled.message,
               type: scheduled.type,
-              scheduledFor: scheduled.scheduledFor
+              scheduledFor: scheduled.scheduledFor,
             }
           });
 
-          console.log(`[💾] Notificación persistente creada (ID: ${notification.id})`);
+          console.log(`[💾] Notificación creada (ID: ${notification.id})`);
 
-          // 2. Emitir al usuario si está conectado
+          // Emitir por socket si está conectado
           io.to(`user_${scheduled.userId}`).emit('notification', notification);
-          console.log(`[📡] Notificación emitida a user_${scheduled.userId}`);
+          console.log(`[📡] Emitida a user_${scheduled.userId}`);
 
-          // 3. Marcar como enviada
+          // Marcar como enviada
           await prisma.scheduledNotification.update({
             where: { id: scheduled.id },
             data: { sent: true }
           });
 
-          console.log(`[✅] Notificación marcada como enviada (ID: ${scheduled.id})`);
+          console.log(`[✅] Marcada como enviada (ID: ${scheduled.id})`);
         } catch (error) {
-          console.error(`❌ Error al procesar notificación ID ${scheduled.id}:`, error);
+          console.error(`❌ Error procesando notificación ${scheduled.id}:`, error);
         }
       }
-
     } catch (err) {
-      console.error('❌ Error al procesar notificaciones programadas:', err);
+      console.error('❌ Error global en procesamiento de notificaciones:', err);
     }
   };
 
-  // Iniciar loop
   setInterval(processNotifications, intervalMs);
   console.log('⏳ Scheduler de notificaciones programadas iniciado.');
 }
