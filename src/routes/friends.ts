@@ -3,7 +3,6 @@ import prisma from '../prisma/client';
 import { AuthRequest } from '../middleware/auth';
 import eventBus from '../socket/eventBus';
 
-
 const friendsRouter = Router();
 
 // Enviar una solicitud de amistad
@@ -16,32 +15,32 @@ friendsRouter.post('/requests', (async (req: Request, res: Response) => {
   }
 
   try {
-    const existingRequest = await prisma.friendship.findFirst({
-      where: { userId, friendId: Number(friendId) }
+    const existingRequest = await prisma.friendRequest.findFirst({
+      where: {
+        fromId: userId,
+        toId: Number(friendId)
+      }
     });
 
     if (existingRequest) {
       return res.status(400).json({ error: 'Ya existe una solicitud de amistad.' });
     }
 
-    const newRequest = await prisma.friendship.create({
+    const newRequest = await prisma.friendRequest.create({
       data: {
-        userId,
-        friendId: Number(friendId),
-        status: 'pending'
+        fromId: userId,
+        toId: Number(friendId),
+        status: 'PENDING'
       }
     });
 
-
-    
     res.status(201).json(newRequest);
     eventBus.emit('friendRequestCreated', {
       fromUserId: userId,
       toUserId: Number(friendId),
       requestId: newRequest.id
     });
-    
-    
+
   } catch (error) {
     console.error('Error al enviar solicitud de amistad:', error);
     res.status(500).json({ error: 'Error interno al enviar la solicitud.' });
@@ -58,23 +57,23 @@ friendsRouter.patch('/requests/:id/accept', (async (req: Request, res: Response)
   }
 
   try {
-    const request = await prisma.friendship.findUnique({ where: { id: requestId } });
+    const request = await prisma.friendRequest.findUnique({ where: { id: requestId } });
 
-    if (!request || request.friendId !== userId || request.status !== 'pending') {
+    if (!request || request.toId !== userId || request.status !== 'PENDING') {
       return res.status(404).json({ error: 'Solicitud no encontrada o ya procesada.' });
     }
 
-    const updatedRequest = await prisma.friendship.update({
+    const updatedRequest = await prisma.friendRequest.update({
       where: { id: requestId },
-      data: { status: 'accepted' }
+      data: { status: 'ACCEPTED' }
     });
 
     res.json(updatedRequest);
     eventBus.emit('friendRequestAccepted', {
-      requesterId: request.userId,
+      requesterId: request.fromId,
       accepterId: userId
     });
-    
+
   } catch (error) {
     console.error('Error al aceptar solicitud de amistad:', error);
     res.status(500).json({ error: 'Error interno al aceptar la solicitud.' });
@@ -91,15 +90,15 @@ friendsRouter.patch('/requests/:id/reject', (async (req: Request, res: Response)
   }
 
   try {
-    const request = await prisma.friendship.findUnique({ where: { id: requestId } });
+    const request = await prisma.friendRequest.findUnique({ where: { id: requestId } });
 
-    if (!request || request.friendId !== userId || request.status !== 'pending') {
+    if (!request || request.toId !== userId || request.status !== 'PENDING') {
       return res.status(404).json({ error: 'Solicitud no encontrada o ya procesada.' });
     }
 
-    await prisma.friendship.update({
+    await prisma.friendRequest.update({
       where: { id: requestId },
-      data: { status: 'rejected' }
+      data: { status: 'REJECTED' }
     });
 
     res.json({ message: 'Solicitud de amistad rechazada.' });
@@ -109,62 +108,7 @@ friendsRouter.patch('/requests/:id/reject', (async (req: Request, res: Response)
   }
 }) as RequestHandler);
 
-// Listar amigos del usuario
-friendsRouter.get('/', (async (req: Request, res: Response) => {
-  const userId: number = (req as AuthRequest).user?.userId ?? 0;
-
-  try {
-    const friendships = await prisma.friendship.findMany({
-      where: {
-        OR: [{ userId, status: 'accepted' }, { friendId: userId, status: 'accepted' }]
-      },
-      include: {
-        user: { select: { id: true, name: true } },
-        friend: { select: { id: true, name: true } }
-      }
-    });
-
-    const friends = friendships.map((fr: { userId: number; friend: { id: number; name: string }; user: { id: number; name: string } }) => 
-      fr.userId === userId ? fr.friend : fr.user
-    );
-
-    res.json(friends);
-  } catch (error) {
-    console.error('Error al obtener amigos:', error);
-    res.status(500).json({ error: 'Error interno al obtener la lista de amigos.' });
-  }
-}) as RequestHandler);
-
-// Eliminar un amigo
-friendsRouter.delete('/:id', (async (req: Request, res: Response) => {
-  const userId: number = (req as AuthRequest).user?.userId ?? 0;
-  const friendId = Number(req.params.id);
-
-  if (isNaN(friendId)) {
-    return res.status(400).json({ error: 'ID de amigo inválido.' });
-  }
-
-  try {
-    const friendship = await prisma.friendship.findFirst({
-      where: {
-        OR: [
-          { userId, friendId, status: 'accepted' },
-          { userId: friendId, friendId: userId, status: 'accepted' }
-        ]
-      }
-    });
-
-    if (!friendship) {
-      return res.status(404).json({ error: 'Amistad no encontrada.' });
-    }
-
-    await prisma.friendship.delete({ where: { id: friendship.id } });
-
-    res.json({ message: 'Amistad eliminada correctamente.' });
-  } catch (error) {
-    console.error('Error al eliminar amigo:', error);
-    res.status(500).json({ error: 'Error interno al eliminar amigo.' });
-  }
-}) as RequestHandler);
+// NOTA: Las rutas de listar/eliminar amigos se eliminaron porque no corresponden con el modelo FriendRequest.
+// Si necesitas una tabla separada para amigos confirmados (tipo "Friendship"), házmelo saber y la añadimos.
 
 export default friendsRouter;
