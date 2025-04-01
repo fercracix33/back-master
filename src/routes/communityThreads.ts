@@ -111,10 +111,12 @@ communityThreadsRouter.post('/:threadId/comments', (async (req: AuthRequest, res
 
     console.log('[POST] Comentario creado:', comment);
     res.status(201).json(comment);
-    eventBus.emit('threadCommentCreated', {
+    eventBus.emit('commentAdded', {
       threadId: thread.id,
-      commenterId: userId
+      commenterId: userId,
+      communityId: thread.communityId
     });
+    
     
   } catch (error) {
     console.error('❌ Error al comentar en el hilo:', error);
@@ -154,6 +156,13 @@ communityThreadsRouter.post('/', (async (req: AuthRequest, res: Response) => {
 
     console.log('[POST] Hilo creado:', thread);
     res.status(201).json(thread);
+
+    eventBus.emit('threadCreated', {
+      threadId: thread.id,
+      authorId: userId,
+      communityId
+    });
+    
   } catch (error) {
     console.error('❌ Error al crear hilo:', error);
     res.status(500).json({ error: 'Error al crear hilo.' });

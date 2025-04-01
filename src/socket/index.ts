@@ -170,43 +170,79 @@ export default function configureSockets(io: SocketIOServer) {
     }
   });
 
-  eventBus.on('threadCommentCreated', async ({ threadId, commenterId }) => {
+  eventBus.on('commentAdded', async ({ threadId, commenterId, communityId }) => {
     try {
       const thread = await prisma.communityThread.findUnique({
         where: { id: threadId },
-        include: { author: true }
+        select: { title: true }
       });
-
-      const commenter = await prisma.user.findUnique({ where: { id: commenterId }, select: { name: true } });
-      const commenterName = commenter?.name || 'Alguien';
-
-      const comments = await prisma.threadComment.findMany({
-        where: { threadId },
-        select: { authorId: true }
+  
+      const commenter = await prisma.user.findUnique({
+        where: { id: commenterId },
+        select: { name: true }
       });
-
-      const participantIds = new Set<number>();
-      for (const comment of comments) {
-        participantIds.add(comment.authorId);
-      }
-      participantIds.add(thread!.authorId);
-      participantIds.delete(commenterId);
-
-      const messageText = `${commenterName} comentó en el hilo "${thread?.title}".`;
-
-      for (const userId of participantIds) {
+  
+      const members = await prisma.communityMembership.findMany({
+        where: { communityId },
+        select: { userId: true }
+      });
+  
+      const message = `${commenter?.name || 'Alguien'} comentó en el hilo "${thread?.title}"`;
+  
+      for (const member of members) {
+        if (member.userId === commenterId) continue;
+  
         const notification = await prisma.notification.create({
           data: {
-            userId,
-            message: messageText,
+            userId: member.userId,
+            message,
             type: 'THREAD'
           }
         });
-
-        io.to(`user_${userId}`).emit('notification', notification);
+  
+        io.to(`user_${member.userId}`).emit('notification', notification);
       }
     } catch (error) {
-      console.error('Error en threadCommentCreated:', error);
+      console.error('Error en commentAdded:', error);
     }
   });
+
+  eventBus.on('threadCreated', async ({ threadId, authorId, communityId }) => {
+    try {
+      const thread = await prisma.communityThread.findUnique({
+        where: { id: threadId },
+        select: { title: true }
+      });
+  
+      const author = await prisma.user.findUnique({
+        where: { id: authorId },
+        select: { name: true }
+      });
+  
+      const members = await prisma.communityMembership.findMany({
+        where: { communityId },
+        select: { userId: true }
+      });
+  
+      const message = `${author?.name || 'Alguien'} ha creado un nuevo hilo "${thread?.title}"`;
+  
+      for (const member of members) {
+        if (member.userId === authorId) continue;
+  
+        const notification = await prisma.notification.create({
+          data: {
+            userId: member.userId,
+            message,
+            type: 'THREAD'
+          }
+        });
+  
+        io.to(`user_${member.userId}`).emit('notification', notification);
+      }
+    } catch (error) {
+      console.error('Error en threadCreated:', error);
+    }
+  });
+  
+  
 }

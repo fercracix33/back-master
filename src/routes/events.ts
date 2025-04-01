@@ -45,27 +45,18 @@ eventsRouter.post('/', (async (req: Request, res: Response) => {
       }
     });
 
-    // Programar notificaciones diferidas (con hora UTC real)
+    // Programar notificaciones diferidas (hora local real)
     try {
-      if (!/^\d{2}:\d{2}$/.test(newEvent.startTime)) {
-        throw new Error('Formato de hora de inicio inválido');
-      }
+      const eventDateParts = newEvent.date.toISOString().split('T')[0].split('-');
+      const [year, month, day] = eventDateParts.map(Number);
+      const [hour, minute] = newEvent.startTime.split(':').map(Number);
 
-      const [hourStr, minuteStr] = newEvent.startTime.split(':');
-      const hour = parseInt(hourStr, 10);
-      const minute = parseInt(minuteStr, 10);
-
-      const eventStart = new Date(`${newEvent.date.toISOString().split('T')[0]}T00:00:00.000Z`);
-      eventStart.setUTCHours(hour);
-      eventStart.setUTCMinutes(minute);
-      eventStart.setUTCSeconds(0);
-      eventStart.setUTCMilliseconds(0);
-
+      const eventStart = new Date(year, month - 1, day, hour, minute);
       const reminderMs = (newEvent.reminderMinutes || 1440) * 60 * 1000;
       const scheduledForUTC = new Date(eventStart.getTime() - reminderMs);
 
-      console.log(`[🕒] Hora del evento: ${eventStart.toISOString()}`);
-      console.log(`[⏰] Notificación programada para: ${scheduledForUTC.toISOString()}`);
+      console.log(`[🕒] Hora del evento (local interpretado): ${eventStart.toISOString()}`);
+      console.log(`[⏰] Notificación programada para (UTC): ${scheduledForUTC.toISOString()}`);
 
       const scheduledNotificationsData = newEvent.participants.map((participant: { id: number }) => ({
         userId: participant.id,
@@ -89,6 +80,7 @@ eventsRouter.post('/', (async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Error interno al crear el evento.' });
   }
 }) as RequestHandler);
+
 // Obtener eventos del usuario (personales y compartidos)
 eventsRouter.get('/', (async (req: Request, res: Response) => {
   const userId: number = (req as AuthRequest).user?.userId ?? 0;
