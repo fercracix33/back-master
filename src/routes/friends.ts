@@ -47,7 +47,7 @@ friendsRouter.post('/requests', (async (req: Request, res: Response) => {
   }
 }) as RequestHandler);
 
-// Aceptar una solicitud de amistad
+// Aceptar una solicitud de amistad y crear relación bidireccional
 friendsRouter.patch('/requests/:id/accept', (async (req: Request, res: Response) => {
   const userId: number = (req as AuthRequest).user?.userId ?? 0;
   const requestId = Number(req.params.id);
@@ -66,6 +66,15 @@ friendsRouter.patch('/requests/:id/accept', (async (req: Request, res: Response)
     const updatedRequest = await prisma.friendRequest.update({
       where: { id: requestId },
       data: { status: 'ACCEPTED' }
+    });
+
+    // Crear la relación de amistad (doble entrada)
+    await prisma.friendship.createMany({
+      data: [
+        { userId: request.fromId, friendId: userId },
+        { userId: userId, friendId: request.fromId }
+      ],
+      skipDuplicates: true
     });
 
     res.json(updatedRequest);
@@ -108,7 +117,77 @@ friendsRouter.patch('/requests/:id/reject', (async (req: Request, res: Response)
   }
 }) as RequestHandler);
 
-// NOTA: Las rutas de listar/eliminar amigos se eliminaron porque no corresponden con el modelo FriendRequest.
-// Si necesitas una tabla separada para amigos confirmados (tipo "Friendship"), házmelo saber y la añadimos.
+// Listar solicitudes recibidas pendientes
+friendsRouter.get('/requests/received', (async (req: Request, res: Response) => {
+  const userId: number = (req as AuthRequest).user?.userId ?? 0;
+
+  try {
+    const requests = await prisma.friendRequest.findMany({
+      where: {
+        toId: userId,
+        status: 'PENDING'
+      },
+      include: {
+        from: { select: { id: true, name: true } }
+      }
+    });
+
+    res.json(requests);
+  } catch (error) {
+    console.error('Error al obtener solicitudes recibidas:', error);
+    res.status(500).json({ error: 'Error interno al obtener solicitudes.' });
+  }
+}) as RequestHandler);
+
+// Listar amigos actuales
+friendsRouter.get('/', (async (req: Request, res: Response) => {
+  const userId: number = (req as AuthRequest).user?.userId ?? 0;
+
+  try {
+    const friendships = await prisma.friendship.findMany({
+      where: { userId },
+      include: {
+        friend: { select: { id: true, name: true } }
+      }
+    });
+
+    const friends = friendships.map((f: { friend: { id: number; name: string } }) => f.friend);
+    res.json(friends);
+  } catch (error) {
+    console.error('Error al obtener amigos:', error);
+    res.status(500).json({ error: 'Error interno al obtener la lista de amigos.' });
+  }
+}) as RequestHandler);
+
+// Eliminar un amigo (relación bidireccional)
+friendsRouter.delete('/:id', (async (req: Request, res: Response) => {
+  const userId: number = (req as AuthRequest).user?.userId ?? 0;
+  const friendId = Number(req.params.id);
+
+  if (isNaN(friendId)) {
+    return res.status(400).json({ error: 'ID de amigo inválido.' });
+  }
+
+  try {
+    const deleted = await prisma.friendship.deleteMany({
+      where: {
+        OR: [
+          { userId, friendId },
+          { userId: friendId, friendId: userId }
+        ]
+      }
+    });
+
+    if (deleted.count === 0) {
+      return res.status(404).json({ error: 'Amistad no encontrada.' });
+    }
+
+    res.json({ message: 'Amistad eliminada correctamente.' });
+  } catch (error) {
+    console.error('Error al eliminar amigo:', error);
+    res.status(500).json({ error: 'Error interno al eliminar amigo.' });
+  }
+}) as RequestHandler);
+
 
 export default friendsRouter;

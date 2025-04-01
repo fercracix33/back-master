@@ -59,6 +59,8 @@ model User {
   threadComments         ThreadComment[]
   ownedCommunities       Community[]            @relation("OwnedCommunities")
   scheduledNotifications ScheduledNotification[]
+    friendships        Friendship[] @relation("UserFriends")
+  friendsWithMe      Friendship[] @relation("FriendOf")
 }
 
 // ✅ Modelo de Nota
@@ -332,4 +334,16 @@ model ScheduledNotification {
   createdAt    DateTime  @default(now())
 
   user         User      @relation(fields: [userId], references: [id])
+}
+
+model Friendship {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  friendId  Int
+  createdAt DateTime @default(now())
+
+  user      User     @relation("UserFriends", fields: [userId], references: [id])
+  friend    User     @relation("FriendOf", fields: [friendId], references: [id])
+
+  @@unique([userId, friendId])
 }
