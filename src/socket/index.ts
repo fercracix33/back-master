@@ -28,8 +28,16 @@ export default function configureSockets(io: SocketIOServer) {
 
         const chat = await prisma.chat.findUnique({
           where: { id: chatId },
-          include: { users: { select: { id: true } }, isGroup: true, name: true }
+          select: {
+            id: true,
+            isGroup: true,
+            name: true,
+            users: {
+              select: { id: true }
+            }
+          }
         });
+        
 
         if (!chat) return socket.emit('error', 'Chat no encontrado.');
 
