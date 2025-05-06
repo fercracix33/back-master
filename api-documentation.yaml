@@ -1,0 +1,1741 @@
+openapi: 3.0.0
+info:
+  title: API del Proyecto
+  description: Documentación completa de la API para el backend del proyecto.
+  version: 1.0.0
+servers:
+  - url: http://localhost:4000/api
+    description: Servidor local
+paths:
+  /auth/register:
+    post:
+      summary: Registro de usuarios
+      description: Permite registrar un nuevo usuario.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+              required:
+                - name
+                - email
+                - password
+      responses:
+        '201':
+          description: Usuario registrado exitosamente.
+        '400':
+          description: Error en los datos proporcionados.
+        '500':
+          description: Error interno del servidor.
+  /auth/login:
+    post:
+      summary: Inicio de sesión
+      description: Permite a un usuario iniciar sesión.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+              required:
+                - email
+                - password
+      responses:
+        '200':
+          description: Inicio de sesión exitoso.
+        '401':
+          description: Credenciales inválidas.
+        '500':
+          description: Error interno del servidor.
+  /auth/me:
+    get:
+      summary: Información del usuario autenticado
+      description: Devuelve los datos del usuario autenticado.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Información del usuario.
+        '401':
+          description: Token no válido o no proporcionado.
+        '500':
+          description: Error interno del servidor.
+  /notes:
+    get:
+      summary: Obtener todas las notas del usuario
+      description: Devuelve todas las notas del usuario autenticado (privadas y públicas propias).
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de notas.
+        '500':
+          description: Error interno del servidor.
+    post:
+      summary: Crear una nueva nota
+      description: Permite crear una nueva nota (pública o privada).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+                isPublic:
+                  type: boolean
+                folderId:
+                  type: integer
+              required:
+                - title
+                - content
+      responses:
+        '201':
+          description: Nota creada exitosamente.
+        '400':
+          description: Error en los datos proporcionados.
+        '500':
+          description: Error interno del servidor.
+  /notes/public:
+    get:
+      summary: Obtener todas las notas públicas
+      description: Devuelve todas las notas públicas disponibles.
+      responses:
+        '200':
+          description: Lista de notas públicas.
+        '500':
+          description: Error interno del servidor.
+  /notes/public/{id}:
+    get:
+      summary: Obtener una nota pública por ID
+      description: Devuelve una nota pública específica por su ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Detalles de la nota pública.
+        '404':
+          description: Nota no encontrada.
+        '500':
+          description: Error interno del servidor.
+  /notes/{id}:
+    patch:
+      summary: Editar una nota
+      description: Permite editar una nota (privada o pública).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+                isPublic:
+                  type: boolean
+              required:
+                - title
+                - content
+      responses:
+        '200':
+          description: Nota actualizada exitosamente.
+        '400':
+          description: Error en los datos proporcionados.
+        '404':
+          description: Nota no encontrada.
+        '500':
+          description: Error interno del servidor.
+    delete:
+      summary: Eliminar una nota
+      description: Permite eliminar una nota específica.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Nota eliminada exitosamente.
+        '404':
+          description: Nota no encontrada.
+        '500':
+          description: Error interno del servidor.
+  /notes/{id}/move:
+    put:
+      summary: Mover una nota a otra carpeta
+      description: Permite mover una nota a una carpeta diferente.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                newFolderId:
+                  type: integer
+      responses:
+        '200':
+          description: Nota movida exitosamente.
+        '400':
+          description: Error en los datos proporcionados.
+        '404':
+          description: Nota o carpeta no encontrada.
+        '500':
+          description: Error interno del servidor.
+  /friends/requests:
+    post:
+      summary: Enviar solicitud de amistad
+      description: Permite enviar una solicitud de amistad a otro usuario.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                friendId:
+                  type: integer
+              required:
+                - friendId
+      responses:
+        '201':
+          description: Solicitud de amistad enviada.
+        '400':
+          description: Error en los datos proporcionados.
+        '500':
+          description: Error interno del servidor.
+  /friends:
+    get:
+      summary: Listar amigos
+      description: Devuelve la lista de amigos del usuario autenticado.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de amigos.
+        '500':
+          description: Error interno del servidor.
+  /boards:
+    post:
+      summary: Crear un nuevo tablero
+      description: Permite crear un nuevo tablero asociado al usuario autenticado.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+              required:
+                - title
+      responses:
+        '201':
+          description: Tablero creado exitosamente.
+        '400':
+          description: El título es obligatorio.
+        '500':
+          description: Error interno del servidor.
+    get:
+      summary: Obtener todos los tableros del usuario
+      description: Devuelve todos los tableros asociados al usuario autenticado.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de tableros.
+        '500':
+          description: Error interno del servidor.
+  /boards/{id}:
+    delete:
+      summary: Eliminar un tablero
+      description: Permite eliminar un tablero específico junto con sus tareas.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Tablero eliminado exitosamente.
+        '404':
+          description: Tablero no encontrado o sin permisos.
+        '500':
+          description: Error interno del servidor.
+  /boards/{boardId}/tasks:
+    post:
+      summary: Crear una tarea en un tablero
+      description: Permite crear una nueva tarea asociada a un tablero específico.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                dueDate:
+                  type: string
+                  format: date-time
+                tags:
+                  type: array
+                  items:
+                    type: string
+              required:
+                - title
+      responses:
+        '201':
+          description: Tarea creada exitosamente.
+        '400':
+          description: El título de la tarea es obligatorio.
+        '404':
+          description: Tablero no encontrado o sin permiso.
+        '500':
+          description: Error interno al crear la tarea.
+    get:
+      summary: Obtener todas las tareas de un tablero
+      description: Devuelve todas las tareas asociadas a un tablero específico.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Lista de tareas.
+        '404':
+          description: Tablero no encontrado o sin permiso.
+        '500':
+          description: Error interno al obtener las tareas.
+  /boards/{boardId}/tasks/{taskId}:
+    patch:
+      summary: Actualizar una tarea
+      description: Permite actualizar los detalles de una tarea específica.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                done:
+                  type: boolean
+                dueDate:
+                  type: string
+                  format: date-time
+                tags:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Tarea actualizada exitosamente.
+        '404':
+          description: Tarea no encontrada o sin permiso.
+        '500':
+          description: Error interno al actualizar la tarea.
+    delete:
+      summary: Eliminar una tarea
+      description: Permite eliminar una tarea específica asociada a un tablero.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Tarea eliminada correctamente.
+        '404':
+          description: Tarea no encontrada o sin permiso.
+        '500':
+          description: Error interno al eliminar la tarea.
+  /chats:
+    post:
+      summary: Crear un nuevo chat
+      description: Permite crear un nuevo chat (privado o grupal).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                isGroup:
+                  type: boolean
+                name:
+                  type: string
+                participantIds:
+                  type: array
+                  items:
+                    type: integer
+              required:
+                - participantIds
+      responses:
+        '201':
+          description: Chat creado exitosamente.
+        '400':
+          description: Error en los datos proporcionados.
+        '500':
+          description: Error interno del servidor.
+    get:
+      summary: Obtener lista de chats del usuario autenticado
+      description: Devuelve todos los chats asociados al usuario autenticado.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de chats.
+        '500':
+          description: Error interno del servidor.
+  /chats/{chatId}/messages:
+    get:
+      summary: Obtener mensajes de un chat específico
+      description: Devuelve los mensajes de un chat específico al que pertenece el usuario autenticado.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Lista de mensajes del chat.
+        '400':
+          description: ID de chat inválido.
+        '403':
+          description: No tienes permiso para acceder a este chat.
+        '404':
+          description: Chat no encontrado.
+        '500':
+          description: Error interno del servidor.
+  /communities:
+    post:
+      summary: Crear una comunidad
+      description: Permite crear una nueva comunidad.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                image:
+                  type: string
+                visibility:
+                  type: string
+                  enum: [PUBLIC, PRIVATE]
+                tags:
+                  type: array
+                  items:
+                    type: integer
+              required:
+                - name
+      responses:
+        '201':
+          description: Comunidad creada exitosamente.
+        '400':
+          description: El nombre es obligatorio.
+        '500':
+          description: Error interno al crear la comunidad.
+    get:
+      summary: Obtener todas las comunidades
+      description: Devuelve todas las comunidades disponibles (información limitada en privadas).
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de comunidades.
+        '500':
+          description: Error interno.
+  /communities/public:
+    get:
+      summary: Obtener comunidades públicas
+      description: Devuelve todas las comunidades públicas disponibles.
+      responses:
+        '200':
+          description: Lista de comunidades públicas.
+        '500':
+          description: Error interno.
+  /communities/me:
+    get:
+      summary: Obtener comunidades del usuario actual
+      description: Devuelve todas las comunidades a las que pertenece el usuario autenticado.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de comunidades del usuario.
+        '500':
+          description: Error interno.
+  /communities/{id}:
+    get:
+      summary: Obtener detalles de una comunidad
+      description: Devuelve los detalles de una comunidad específica.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Detalles de la comunidad.
+        '404':
+          description: Comunidad no encontrada.
+        '500':
+          description: Error interno.
+    patch:
+      summary: Actualizar una comunidad
+      description: Permite actualizar los detalles de una comunidad específica.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                image:
+                  type: string
+                visibility:
+                  type: string
+                  enum: [PUBLIC, PRIVATE]
+      responses:
+        '200':
+          description: Comunidad actualizada exitosamente.
+        '403':
+          description: No autorizado.
+        '500':
+          description: Error interno.
+    delete:
+      summary: Eliminar una comunidad
+      description: Permite eliminar una comunidad específica.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Comunidad eliminada correctamente.
+        '403':
+          description: Solo el creador puede eliminar la comunidad.
+        '500':
+          description: Error interno.
+  /communities/{id}/join-request:
+    post:
+      summary: Enviar solicitud de unión a una comunidad
+      description: Permite enviar una solicitud para unirse a una comunidad privada.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '201':
+          description: Solicitud enviada correctamente.
+        '400':
+          description: Ya eres miembro o ya has solicitado unirte.
+        '500':
+          description: Error interno.
+  /communities/{id}/join-requests:
+    get:
+      summary: Ver solicitudes pendientes de unión
+      description: Devuelve las solicitudes pendientes de unión a una comunidad (solo para admins).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Lista de solicitudes pendientes.
+        '403':
+          description: No autorizado.
+        '500':
+          description: Error interno.
+  /communities/{id}/join-requests/{requestId}/accept:
+    post:
+      summary: Aceptar solicitud de unión
+      description: Permite aceptar una solicitud de unión a una comunidad.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Solicitud aceptada correctamente.
+        '403':
+          description: No autorizado.
+        '404':
+          description: Solicitud no encontrada.
+        '500':
+          description: Error interno.
+  /communities/{id}/join-requests/{requestId}:
+    delete:
+      summary: Rechazar solicitud de unión
+      description: Permite rechazar una solicitud de unión a una comunidad.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Solicitud rechazada correctamente.
+        '403':
+          description: No autorizado.
+        '500':
+          description: Error interno.
+  /communities/{id}/join:
+    post:
+      summary: Unirse a una comunidad
+      description: Permite unirse a una comunidad pública o enviar solicitud a una privada.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '201':
+          description: Unión exitosa o solicitud enviada.
+        '404':
+          description: Comunidad no encontrada.
+        '500':
+          description: Error interno.
+  /communities/{id}/members:
+    get:
+      summary: Obtener miembros de una comunidad
+      description: Devuelve la lista de miembros de una comunidad con sus roles.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Lista de miembros.
+        '403':
+          description: No autorizado.
+        '500':
+          description: Error interno.
+  /communities/{id}/promote/{userId}:
+    patch:
+      summary: Ascender a moderador
+      description: Permite ascender a un miembro a moderador (solo admins).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Usuario ascendido a moderador.
+        '403':
+          description: No autorizado.
+        '500':
+          description: Error interno.
+  /communities/{id}/demote/{userId}:
+    patch:
+      summary: Degradar a miembro
+      description: Permite degradar a un moderador a miembro (solo admins).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Moderador degradado a miembro.
+        '403':
+          description: No autorizado.
+        '500':
+          description: Error interno.
+  /communities/{id}/kick/{userId}:
+    delete:
+      summary: Expulsar miembro
+      description: Permite expulsar a un miembro de una comunidad (excepto al admin).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Miembro expulsado correctamente.
+        '403':
+          description: No autorizado o intento de expulsar al admin.
+        '404':
+          description: Miembro no encontrado.
+        '500':
+          description: Error interno.
+  /communities/{id}/leave:
+    delete:
+      summary: Abandonar una comunidad
+      description: Permite al usuario autenticado abandonar una comunidad.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Has salido de la comunidad.
+        '403':
+          description: El admin no puede abandonar la comunidad.
+        '404':
+          description: No perteneces a esta comunidad.
+        '500':
+          description: Error interno.
+  /communities/{id}/metrics:
+    get:
+      summary: Obtener métricas de una comunidad
+      description: Devuelve métricas de una comunidad (número de miembros, recursos, hilos, etc.).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Métricas de la comunidad.
+        '404':
+          description: Comunidad no encontrada.
+        '500':
+          description: Error interno.
+  /community-resources:
+    post:
+      summary: Añadir recurso a una comunidad
+      description: Permite añadir un recurso (archivo, nota o carpeta) a una comunidad.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                communityId:
+                  type: integer
+                resourceId:
+                  type: integer
+                resourceType:
+                  type: string
+                  enum: [NOTE, FILE, FOLDER]
+                tags:
+                  type: array
+                  items:
+                    type: integer
+                title:
+                  type: string
+                description:
+                  type: string
+              required:
+                - communityId
+                - resourceId
+                - resourceType
+                - title
+      responses:
+        '201':
+          description: Recurso añadido exitosamente.
+        '400':
+          description: Faltan parámetros obligatorios.
+        '403':
+          description: No tienes acceso al recurso o comunidad.
+        '500':
+          description: Error interno al añadir recurso.
+  /community-resources/{communityId}:
+    get:
+      summary: Obtener recursos de una comunidad
+      description: Devuelve todos los recursos asociados a una comunidad específica.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: communityId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Lista de recursos de la comunidad.
+        '403':
+          description: No tienes acceso a los recursos de esta comunidad.
+        '404':
+          description: Comunidad no encontrada.
+        '500':
+          description: Error interno al obtener recursos.
+  /community-resources/{id}/detail:
+    get:
+      summary: Obtener detalle de un recurso comunitario
+      description: Devuelve el detalle completo de un recurso comunitario sin clonarlo.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Detalle del recurso comunitario.
+        '403':
+          description: No tienes acceso a este recurso.
+        '404':
+          description: Recurso no encontrado.
+        '500':
+          description: Error interno al obtener detalle del recurso.
+  /community-resources/{resourceId}:
+    delete:
+      summary: Eliminar recurso de comunidad
+      description: Permite eliminar un recurso asociado a una comunidad.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Recurso eliminado correctamente.
+        '403':
+          description: Permisos insuficientes para eliminar el recurso.
+        '404':
+          description: Recurso no encontrado.
+        '500':
+          description: Error interno al eliminar recurso.
+  /community-resources/{resourceId}/tags:
+    post:
+      summary: Añadir etiquetas a un recurso comunitario
+      description: Permite añadir etiquetas a un recurso comunitario.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tags:
+                  type: array
+                  items:
+                    type: integer
+      responses:
+        '200':
+          description: Etiquetas añadidas correctamente.
+        '403':
+          description: Permisos insuficientes.
+        '404':
+          description: Recurso no encontrado.
+        '500':
+          description: Error interno al añadir etiquetas.
+  /community-resources/{resourceId}/tags/{tagId}:
+    delete:
+      summary: Eliminar etiqueta de un recurso comunitario
+      description: Permite eliminar una etiqueta asociada a un recurso comunitario.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: tagId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Etiqueta eliminada correctamente.
+        '403':
+          description: Permisos insuficientes.
+        '404':
+          description: Recurso o etiqueta no encontrada.
+        '500':
+          description: Error interno al eliminar etiqueta.
+  /community-resources/{id}/clone:
+    post:
+      summary: Clonar recurso comunitario
+      description: Permite clonar un recurso comunitario al espacio personal del usuario.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                destinationFolderId:
+                  type: integer
+      responses:
+        '201':
+          description: Recurso clonado correctamente.
+        '403':
+          description: No tienes acceso al recurso o comunidad.
+        '404':
+          description: Recurso o carpeta destino no encontrada.
+        '500':
+          description: Error interno al clonar recurso.
+  /community-threads/thread/{threadId}:
+    get:
+      summary: Obtener detalles de un hilo
+      description: Devuelve los detalles de un hilo específico, incluyendo autor y comentarios.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Detalles del hilo.
+        '400':
+          description: ID de hilo inválido.
+        '404':
+          description: Hilo no encontrado.
+        '500':
+          description: Error interno al obtener detalles del hilo.
+    delete:
+      summary: Eliminar un hilo
+      description: Permite eliminar un hilo específico si el usuario tiene permisos.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Hilo eliminado correctamente.
+        '401':
+          description: No autenticado.
+        '403':
+          description: No tienes permiso para eliminar este hilo.
+        '404':
+          description: Hilo no encontrado.
+        '500':
+          description: Error interno al eliminar hilo.
+  /community-threads/{threadId}/comments:
+    post:
+      summary: Comentar en un hilo
+      description: Permite añadir un comentario a un hilo específico.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+              required:
+                - content
+      responses:
+        '201':
+          description: Comentario creado exitosamente.
+        '400':
+          description: El comentario no puede estar vacío.
+        '401':
+          description: No autenticado.
+        '403':
+          description: No tienes permiso para comentar en este hilo.
+        '404':
+          description: Hilo no encontrado.
+        '500':
+          description: Error interno al añadir comentario.
+  /community-threads:
+    post:
+      summary: Crear un hilo en una comunidad
+      description: Permite crear un nuevo hilo en una comunidad específica.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                communityId:
+                  type: integer
+                title:
+                  type: string
+                content:
+                  type: string
+              required:
+                - communityId
+                - title
+                - content
+      responses:
+        '201':
+          description: Hilo creado exitosamente.
+        '400':
+          description: Faltan parámetros obligatorios.
+        '401':
+          description: No autenticado.
+        '403':
+          description: No perteneces a esta comunidad.
+        '500':
+          description: Error interno al crear hilo.
+  /community-threads/{communityId}:
+    get:
+      summary: Obtener hilos de una comunidad
+      description: Devuelve todos los hilos de una comunidad específica, incluyendo autor y comentarios.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: communityId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Lista de hilos de la comunidad.
+        '400':
+          description: ID de comunidad inválido.
+        '403':
+          description: No tienes acceso a los hilos de esta comunidad.
+        '404':
+          description: Comunidad no encontrada.
+        '500':
+          description: Error interno al obtener hilos.
+  /events:
+    post:
+      summary: Crear un nuevo evento
+      description: Permite crear un nuevo evento de calendario.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                date:
+                  type: string
+                  format: date
+                startTime:
+                  type: string
+                endTime:
+                  type: string
+                category:
+                  type: string
+                color:
+                  type: string
+                participants:
+                  type: array
+                  items:
+                    type: integer
+                reminderMinutes:
+                  type: integer
+              required:
+                - title
+                - date
+                - startTime
+                - endTime
+      responses:
+        '201':
+          description: Evento creado exitosamente.
+        '400':
+          description: Faltan parámetros obligatorios.
+        '500':
+          description: Error interno al crear el evento.
+    get:
+      summary: Obtener eventos del usuario
+      description: Devuelve todos los eventos personales y compartidos del usuario autenticado.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de eventos.
+        '500':
+          description: Error interno al obtener eventos.
+  /events/{id}:
+    get:
+      summary: Obtener un evento específico
+      description: Devuelve los detalles de un evento si el usuario es participante.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Detalles del evento.
+        '400':
+          description: ID de evento inválido.
+        '404':
+          description: Evento no encontrado o sin acceso.
+        '500':
+          description: Error interno al obtener evento.
+    patch:
+      summary: Actualizar un evento
+      description: Permite actualizar un evento existente (solo el propietario).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                date:
+                  type: string
+                  format: date
+                startTime:
+                  type: string
+                endTime:
+                  type: string
+                category:
+                  type: string
+                color:
+                  type: string
+                participants:
+                  type: array
+                  items:
+                    type: integer
+                reminderMinutes:
+                  type: integer
+      responses:
+        '200':
+          description: Evento actualizado exitosamente.
+        '400':
+          description: ID de evento inválido.
+        '403':
+          description: No tienes permiso para modificar este evento.
+        '404':
+          description: Evento no encontrado.
+        '500':
+          description: Error interno al actualizar evento.
+    delete:
+      summary: Eliminar un evento
+      description: Permite eliminar un evento existente (solo el propietario).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Evento eliminado exitosamente.
+        '400':
+          description: ID de evento inválido.
+        '403':
+          description: No tienes permiso para eliminar este evento.
+        '404':
+          description: Evento no encontrado.
+        '500':
+          description: Error interno al eliminar evento.
+  /files:
+    post:
+      summary: Subir un archivo
+      description: Permite subir un archivo al sistema y almacenarlo en Supabase.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Archivo subido exitosamente.
+        '400':
+          description: No se envió ningún archivo.
+        '401':
+          description: No autenticado.
+        '500':
+          description: Error interno al almacenar el archivo.
+    get:
+      summary: Obtener todos los archivos del usuario
+      description: Devuelve todos los archivos asociados al usuario autenticado.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de archivos del usuario.
+        '500':
+          description: Error interno al obtener archivos.
+  /files/{id}:
+    get:
+      summary: Obtener un archivo por ID
+      description: Devuelve los detalles de un archivo específico, incluyendo su URL pública.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Detalles del archivo.
+        '400':
+          description: ID de archivo inválido.
+        '404':
+          description: Archivo no encontrado o sin permiso.
+        '500':
+          description: Error interno al obtener el archivo.
+    delete:
+      summary: Eliminar un archivo por ID
+      description: Permite eliminar un archivo específico del sistema y de Supabase.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Archivo eliminado correctamente.
+        '400':
+          description: ID de archivo inválido.
+        '404':
+          description: Archivo no encontrado o sin permiso.
+        '500':
+          description: Error interno al eliminar el archivo.
+  /files/{id}/move:
+    put:
+      summary: Mover un archivo a otra carpeta
+      description: Permite mover un archivo a una carpeta diferente.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                newFolderId:
+                  type: integer
+      responses:
+        '200':
+          description: Archivo movido exitosamente.
+        '400':
+          description: ID de archivo inválido.
+        '404':
+          description: Archivo no encontrado o sin permiso.
+        '500':
+          description: Error interno al mover archivo.
+  /folders:
+    post:
+      summary: Crear una nueva carpeta
+      description: Permite crear una nueva carpeta asociada al usuario autenticado.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                parentId:
+                  type: integer
+              required:
+                - name
+      responses:
+        '201':
+          description: Carpeta creada exitosamente.
+        '400':
+          description: El nombre de la carpeta es obligatorio.
+        '500':
+          description: Error interno al crear la carpeta.
+    get:
+      summary: Obtener carpetas del usuario
+      description: Devuelve todas las carpetas asociadas al usuario autenticado.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de carpetas del usuario.
+        '500':
+          description: Error interno al obtener carpetas.
+  /folders/{id}:
+    patch:
+      summary: Editar una carpeta
+      description: Permite editar el nombre de una carpeta específica.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+      responses:
+        '200':
+          description: Carpeta actualizada exitosamente.
+        '400':
+          description: ID de carpeta inválido.
+        '404':
+          description: Carpeta no encontrada o sin acceso.
+        '500':
+          description: Error interno al editar la carpeta.
+    delete:
+      summary: Eliminar una carpeta
+      description: Permite eliminar una carpeta específica y todo su contenido.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Carpeta eliminada correctamente.
+        '400':
+          description: ID de carpeta inválido.
+        '404':
+          description: Carpeta no encontrada o sin acceso.
+        '500':
+          description: Error interno al eliminar la carpeta.
+  /folders/{id}/move:
+    patch:
+      summary: Mover una carpeta
+      description: Permite mover una carpeta dentro de otra.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                newParentId:
+                  type: integer
+      responses:
+        '200':
+          description: Carpeta movida exitosamente.
+        '400':
+          description: ID de carpeta inválido o no puedes mover una carpeta dentro de sí misma.
+        '404':
+          description: Carpeta no encontrada o sin acceso.
+        '500':
+          description: Error interno al mover la carpeta.
+  /notifications:
+    get:
+      summary: Obtener notificaciones del usuario
+      description: Devuelve todas las notificaciones del usuario autenticado, ordenadas por fecha de creación.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de notificaciones.
+        '500':
+          description: Error interno al obtener notificaciones.
+  /notifications/{id}/read:
+    patch:
+      summary: Marcar una notificación como leída
+      description: Permite marcar una notificación específica como leída.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Notificación marcada como leída.
+        '400':
+          description: ID de notificación inválido.
+        '404':
+          description: Notificación no encontrada o no autorizada.
+        '500':
+          description: Error interno al actualizar notificación.
+  /notifications/{id}:
+    delete:
+      summary: Eliminar una notificación
+      description: Permite eliminar una notificación específica del usuario autenticado.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Notificación eliminada correctamente.
+        '400':
+          description: ID de notificación inválido.
+        '404':
+          description: Notificación no encontrada o no autorizada.
+        '500':
+          description: Error interno al eliminar notificación.
+  /notifications/debug/create-test:
+    post:
+      summary: Crear notificación de prueba
+      description: Ruta de depuración para crear una notificación de prueba manualmente.
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Notificación creada exitosamente.
+        '401':
+          description: No autenticado.
+        '500':
+          description: Error interno al crear la notificación.
+  /tags:
+    post:
+      summary: Crear nueva etiqueta
+      description: Permite crear una nueva etiqueta.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+              required:
+                - name
+      responses:
+        '201':
+          description: Etiqueta creada exitosamente.
+        '400':
+          description: El nombre es obligatorio o ya existe una etiqueta con este nombre.
+        '500':
+          description: Error interno al crear etiqueta.
+    get:
+      summary: Obtener todas las etiquetas
+      description: Devuelve todas las etiquetas ordenadas alfabéticamente.
+      responses:
+        '200':
+          description: Lista de etiquetas.
+        '500':
+          description: Error interno al obtener etiquetas.
+  /tags/{id}:
+    patch:
+      summary: Editar etiqueta
+      description: Permite editar el nombre de una etiqueta específica.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+              required:
+                - name
+      responses:
+        '200':
+          description: Etiqueta actualizada exitosamente.
+        '400':
+          description: El nombre es obligatorio.
+        '500':
+          description: Error interno al actualizar etiqueta.
+    delete:
+      summary: Eliminar etiqueta
+      description: Permite eliminar una etiqueta específica.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Etiqueta eliminada correctamente.
+        '500':
+          description: Error interno al eliminar etiqueta.
+  /users:
+    get:
+      summary: Obtener todos los usuarios
+      description: Devuelve una lista de todos los usuarios excepto el usuario autenticado.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de usuarios.
+        '500':
+          description: Error interno al obtener usuarios.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
