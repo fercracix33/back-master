@@ -40,6 +40,37 @@ const getBoards: RequestHandler = async (req, res) => {
   }
 };
 
+// 📌 Actualizar el título de un tablero
+const updateBoard: RequestHandler = async (req, res) => {
+  const userId = (req as AuthRequest).user?.userId || 0;
+  const boardId = Number(req.params.id);
+  const { title } = req.body;
+
+  if (!title) {
+    res.status(400).json({ error: 'El título es obligatorio.' });
+    return;
+  }
+
+  try {
+    const board = await prisma.board.findFirst({ where: { id: boardId, ownerId: userId } });
+    
+    if (!board) {
+      res.status(404).json({ error: 'Tablero no encontrado o sin permisos.' });
+      return;
+    }
+
+    const updatedBoard = await prisma.board.update({
+      where: { id: boardId },
+      data: { title }
+    });
+
+    res.json(updatedBoard);
+  } catch (error) {
+    console.error('Error al actualizar el tablero:', error);
+    res.status(500).json({ error: 'Error interno al actualizar el tablero.' });
+  }
+};
+
 // 📌 Eliminar un tablero junto con sus tareas
 const deleteBoard: RequestHandler = async (req, res) => {
   const userId = (req as AuthRequest).user?.userId || 0;
@@ -182,6 +213,7 @@ const deleteTask: RequestHandler = async (req, res) => {
 // 📌 Registrar rutas de tableros
 boardsRouter.post('/', createBoard);
 boardsRouter.get('/', getBoards);
+boardsRouter.patch('/:id', updateBoard);
 boardsRouter.delete('/:id', deleteBoard);
 
 // 📌 Registrar rutas de tareas
